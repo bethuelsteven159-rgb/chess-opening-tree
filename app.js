@@ -1,6 +1,13 @@
 const STORAGE_KEY = "roadToGmOpeningTree.v1";
 let selectedId = null;
 let currentCard = null;
+const SUPABASE_URL = "https://puhscovkftoffykeyzze.supabase.co/rest/v1/";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB1aHNjb3ZrZnRvZmZ5a2V5enplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDI3NDEsImV4cCI6MjA5NTkxODc0MX0.N1vUdm7UhPxc9KqGRIutgOEqy8PBTyv529rsA4uGwCE";
+
+const supabase = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+);
 
 const starterData = [
   {
