@@ -52,7 +52,20 @@ $("revealBtn").addEventListener("click", () => {
 
 $("anotherBtn").addEventListener("click", drawCard);
 
-OpeningDB.loadNodes().then(data => {
-  nodes = data;
-  drawCard();
-});
+async function initRandomPage() {
+  if (!window.OpeningDB) {
+    console.error("OpeningDB is not defined. Make sure random.html loads js/db.js before js/random.js.");
+    $("randomCard").innerHTML = "<p>Database did not load. Check db.js script order.</p>";
+    return;
+  }
+
+  try {
+    nodes = await window.OpeningDB.loadNodes();
+    drawCard();
+  } catch (error) {
+    console.error("Could not load random cards:", error);
+    $("randomCard").innerHTML = "<p>Could not load cards from Supabase.</p>";
+  }
+}
+
+initRandomPage();
