@@ -1,3 +1,9 @@
+import { requireOnlyMe } from "./auth/only-me-guard.js";
+
+await requireOnlyMe();
+
+// rest of app.js below
+
 let nodes = [];
 let selectedId = null;
 
