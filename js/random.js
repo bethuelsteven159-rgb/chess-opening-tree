@@ -3,6 +3,10 @@ let current = null;
 let revealed = false;
 const $ = id => document.getElementById(id);
 
+import { requireOnlyMe } from "./auth/only-me-guard.js";
+
+await requireOnlyMe();
+
 function pathFor(node) {
   const path = [];
   let currentNode = node;
