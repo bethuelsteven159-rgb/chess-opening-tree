@@ -1,0 +1,25 @@
+{
+  "name": "GM Opening Tree",
+  "short_name": "OpeningTree",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#0a1020",
+  "theme_color": "#111827",
+  "description": "A chess opening tree and random practice card app.",
+  "icons": [
+    {
+      "src": "assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Random Card",
+      "short_name": "Card",
+      "description": "Open a random opening practice card.",
+      "url": "random.html",
+      "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

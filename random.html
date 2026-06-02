@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Random Chess Card</title>
+  <meta name="theme-color" content="#111827" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="random-page">
+  <div class="bg-orb orb-a"></div>
+  <main class="random-shell">
+    <a class="back-link" href="index.html">← Opening Tree</a>
+    <section class="random-card-wrap">
+      <p class="eyebrow">Random practice card</p>
+      <h1>Today’s opening spark</h1>
+      <div id="randomCard" class="practice-card big empty">
+        <p>Loading card...</p>
+      </div>
+      <div class="random-actions">
+        <button id="revealBtn" class="secondary">Reveal explanation</button>
+        <button id="anotherBtn" class="primary">Another card</button>
+      </div>
+      <p class="phone-note">Tip: add this page to your Android home screen for quick drill access.</p>
+    </section>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/random.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js');
+  </script>
+</body>
+</html>

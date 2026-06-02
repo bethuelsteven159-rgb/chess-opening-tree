@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GM Opening Tree</title>
+  <meta name="theme-color" content="#111827" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+
+  <header class="hero">
+    <nav class="topbar">
+      <div class="brand">
+        <span class="logo">♟</span>
+        <div>
+          <h1>GM Opening Tree</h1>
+          <p>Your repertoire cockpit</p>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <a class="ghost" href="random.html">Random Cards</a>
+        <button id="syncBtn" class="primary">Sync</button>
+      </div>
+    </nav>
+
+    <section class="hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">Chess road to GM</p>
+        <h2>Build openings that become weapons, not memory fog.</h2>
+        <p>Add moves, attach explanations, tag ideas, then train from random cards until your repertoire lives in your bones.</p>
+      </div>
+      <div class="stats-card">
+        <div><strong id="nodeCount">0</strong><span>Moves</span></div>
+        <div><strong id="cardCount">0</strong><span>Cards</span></div>
+        <div><strong id="lineCount">0</strong><span>Root lines</span></div>
+      </div>
+    </section>
+  </header>
+
+  <main class="app-shell">
+    <aside class="panel tree-panel">
+      <div class="panel-heading">
+        <h3>Opening Tree</h3>
+        <button id="newRootBtn" class="tiny">+ Root</button>
+      </div>
+      <div id="tree" class="tree"></div>
+    </aside>
+
+    <section class="panel editor-panel">
+      <div class="panel-heading">
+        <h3 id="editorTitle">Select a move</h3>
+        <button id="deleteBtn" class="danger tiny" disabled>Delete</button>
+      </div>
+
+      <form id="moveForm" class="move-form">
+        <label>
+          Move SAN
+          <input id="moveInput" placeholder="e4, Nf3, Bb5..." required />
+        </label>
+        <label>
+          Title
+          <input id="titleInput" placeholder="Italian Game, Main Plan..." />
+        </label>
+        <label>
+          Explanation
+          <textarea id="explanationInput" rows="8" placeholder="What is the point of this move? Piece placement, pawn breaks, traps, plans..."></textarea>
+        </label>
+        <label>
+          Tags
+          <input id="tagsInput" placeholder="Italian, development, center, attack" />
+        </label>
+        <label class="check-row">
+          <input id="practiceInput" type="checkbox" checked />
+          Use as random practice card
+        </label>
+        <div class="form-actions">
+          <button class="primary" type="submit">Save move</button>
+          <button id="addChildBtn" type="button" class="secondary" disabled>+ Add child move</button>
+        </div>
+      </form>
+    </section>
+
+    <aside class="panel practice-panel">
+      <div class="panel-heading">
+        <h3>Quick Practice</h3>
+        <button id="randomBtn" class="tiny">Random</button>
+      </div>
+      <div id="practiceCard" class="practice-card empty">
+        <p>Click Random to summon a card from the tree.</p>
+      </div>
+      <div class="utility-box">
+        <h4>Import / Export</h4>
+        <button id="exportBtn" class="secondary full">Export JSON</button>
+        <label class="file-label">
+          Import JSON
+          <input id="importInput" type="file" accept="application/json" />
+        </label>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <p>Study law: one serious game, one opening note, one repair. Small moves, huge board. ♜</p>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js');
+  </script>
+</body>
+</html>
