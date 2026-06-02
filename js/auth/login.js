@@ -6,10 +6,10 @@ function getRedirectUrl() {
   const currentUrl = window.location.href.split("?")[0].split("#")[0];
 
   if (currentUrl.endsWith("/login.html")) {
-    return currentUrl.replace("/login.html", "/random.html");
+    return currentUrl.replace("/login.html", "/index.html");
   }
 
-  return `${window.location.origin}/chess-opening-tree/random.html`;
+  return `${window.location.origin}/chess-opening-tree/index.html`;
 }
 
 googleLoginBtn.addEventListener("click", async () => {
