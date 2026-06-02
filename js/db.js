@@ -46,7 +46,7 @@ function normalizeNode(node) {
 
 async function loadNodes() {
   const client = getClient();
-  const table = window.APP_CONFIG.TABLE_NAME;
+  const table = window.APP_CONFIG.TABLE_NAME || "opening_nodes";
   if (client) {
     const { data, error } = await client.from(table).select("*").order("created_at", { ascending: true });
     if (!error && data && data.length) return data.map(normalizeNode);
@@ -69,7 +69,7 @@ async function saveAllNodes(nodes) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
   const client = getClient();
   if (!client) return clean;
-  const table = window.APP_CONFIG.TABLE_NAME;
+  const table = window.APP_CONFIG.TABLE_NAME || "opening_nodes";
   const { error: deleteError } = await client.from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000");
   if (deleteError) throw deleteError;
   if (clean.length) {
