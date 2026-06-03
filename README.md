@@ -9,7 +9,7 @@ A GitHub Pages + Supabase chess opening tree app.
 - `styles.css` - full design
 - `js/config.js` - paste your Supabase URL and anon key here
 - `js/db.js` - Supabase/localStorage database layer
-- `js/app.js` - tree editor logic
+- `js/app.js` - tree editor logic, expand/collapse display, and move highlights
 - `js/random.js` - random card logic
 - `supabase/schema.sql` - database table and testing policies
 
@@ -24,6 +24,14 @@ A GitHub Pages + Supabase chess opening tree app.
 7. Open the GitHub Pages URL on your phone.
 8. For quick practice, open `/random.html` and add it to your phone home screen.
 
+## Using the tree
+
+- The tree starts collapsed, so only root moves show first.
+- Click a move row once to select it and show/hide only its direct child moves.
+- Use the `Move highlight` field to colour a move as a blunder, great move, or brilliant move.
+
 ## Important
 
 The included Row Level Security policies are open for testing. That means anyone with the website link can edit data. Once the app works, change to authenticated policies.
+
+If you already created the Supabase table before move highlights were added, run the updated `supabase/schema.sql` again. It safely adds the new `highlight_kind` column without deleting your table.

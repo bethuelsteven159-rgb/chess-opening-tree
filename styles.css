@@ -80,7 +80,7 @@ button, .ghost, .file-label {
   cursor: pointer;
   color: var(--text);
   text-decoration: none;
-  transition: transform .16s ease, opacity .16s ease, background .16s ease, border-color .16s ease;
+  transition: transform .16s ease, opacity .16s ease, background .16s ease, border-color .16s ease, box-shadow .16s ease;
 }
 button:hover, .ghost:hover, .file-label:hover { transform: translateY(-1px); }
 button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
@@ -164,6 +164,25 @@ button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
   outline: 2px solid rgba(251, 191, 36, .58);
   background: linear-gradient(135deg, rgba(251, 191, 36, .16), rgba(96, 165, 250, .08));
 }
+
+.node-button.highlight-blunder {
+  border-color: rgba(251, 113, 133, .72);
+  background: linear-gradient(135deg, rgba(127, 29, 29, .48), rgba(15, 23, 42, .62));
+}
+.node-button.highlight-great {
+  border-color: rgba(52, 211, 153, .72);
+  background: linear-gradient(135deg, rgba(6, 78, 59, .45), rgba(15, 23, 42, .62));
+}
+.node-button.highlight-brilliant {
+  border-color: rgba(96, 165, 250, .78);
+  background: linear-gradient(135deg, rgba(14, 116, 144, .46), rgba(67, 56, 202, .22));
+}
+.node-button.highlight-blunder.active,
+.node-button.highlight-great.active,
+.node-button.highlight-brilliant.active {
+  outline: 2px solid rgba(251, 191, 36, .68);
+  box-shadow: 0 0 0 4px rgba(251, 191, 36, .08);
+}
 .node-indent {
   height: 2px;
   border-radius: 999px;
@@ -180,6 +199,15 @@ button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.node-caret {
+  width: 18px;
+  flex: 0 0 18px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--soft);
+  opacity: .9;
+  font-size: 13px;
 }
 .move-san {
   display: inline-flex;
@@ -204,6 +232,21 @@ button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
   font-size: 12px;
   font-weight: 900;
 }
+
+.mark-badge {
+  display: inline-grid;
+  place-items: center;
+  min-height: 22px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: .01em;
+  white-space: nowrap;
+}
+.mark-blunder { background: rgba(251, 113, 133, .19); color: #fecdd3; border: 1px solid rgba(251, 113, 133, .34); }
+.mark-great { background: rgba(52, 211, 153, .17); color: #bbf7d0; border: 1px solid rgba(52, 211, 153, .34); }
+.mark-brilliant { background: rgba(96, 165, 250, .18); color: #dbeafe; border: 1px solid rgba(96, 165, 250, .36); }
 .node-title {
   min-width: 0;
   overflow: hidden;
@@ -218,7 +261,7 @@ button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
 
 .move-form { display: grid; gap: 14px; }
 label { display: grid; gap: 8px; color: var(--soft); font-size: 13px; font-weight: 750; }
-input, textarea {
+input, textarea, select {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--line);
@@ -230,7 +273,8 @@ input, textarea {
   font: inherit;
 }
 textarea { resize: vertical; line-height: 1.55; min-height: 160px; }
-input:focus, textarea:focus { border-color: rgba(251, 191, 36, .55); }
+select { appearance: none; }
+input:focus, textarea:focus, select:focus { border-color: rgba(251, 191, 36, .55); }
 .check-row { display: flex; align-items: center; grid-template-columns: auto 1fr; }
 .check-row input { width: auto; }
 .form-actions { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -242,7 +286,12 @@ input:focus, textarea:focus { border-color: rgba(251, 191, 36, .55); }
   padding: 20px;
   min-height: 220px;
 }
+
+.practice-card.card-blunder { border-color: rgba(251, 113, 133, .56); background: linear-gradient(155deg, rgba(127, 29, 29, .44), rgba(15, 23, 42, .78)); }
+.practice-card.card-great { border-color: rgba(52, 211, 153, .56); background: linear-gradient(155deg, rgba(6, 78, 59, .42), rgba(15, 23, 42, .78)); }
+.practice-card.card-brilliant { border-color: rgba(96, 165, 250, .62); background: linear-gradient(155deg, rgba(14, 116, 144, .40), rgba(67, 56, 202, .22)); }
 .practice-card.empty { display: grid; place-items: center; color: var(--soft); text-align: center; }
+.card-move-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .card-move { font-size: 48px; line-height: 1; color: var(--gold); font-weight: 950; }
 .card-title { margin-top: 9px; font-size: 19px; font-weight: 850; }
 .card-path, .card-tags { margin-top: 12px; color: var(--muted); font-size: 13px; }

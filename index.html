@@ -6,7 +6,7 @@
   <title>GM Opening Tree</title>
   <meta name="theme-color" content="#111827" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=5" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -67,6 +67,15 @@
           <input id="titleInput" placeholder="Italian Game, Main Plan..." />
         </label>
         <label>
+          Move highlight
+          <select id="highlightInput">
+            <option value="">Normal / no highlight</option>
+            <option value="blunder">Blunder</option>
+            <option value="great">Great move</option>
+            <option value="brilliant">Brilliant move</option>
+          </select>
+        </label>
+        <label>
           Explanation
           <textarea id="explanationInput" rows="8" placeholder="What is the point of this move? Piece placement, pawn breaks, traps, plans..."></textarea>
         </label>
@@ -110,7 +119,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
-  <script type="module" src="./js/app.js?v=4"></script>
+  <script type="module" src="./js/app.js?v=5"></script>
   <script>
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js');
   </script>

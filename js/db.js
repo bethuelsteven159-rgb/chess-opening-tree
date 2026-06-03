@@ -94,10 +94,34 @@ function normalizeNode(node) {
     move: node.move || "New move",
     title: node.title || "",
     explanation: node.explanation || "",
+    highlight_kind: ["blunder", "great", "brilliant"].includes(node.highlight_kind) ? node.highlight_kind : "",
     tags: Array.isArray(node.tags) ? node.tags : [],
     is_practice_card: node.is_practice_card !== false,
     created_at: node.created_at || new Date().toISOString()
   };
+}
+
+
+async function tableSupportsHighlightKind(client, table) {
+  const { error } = await client
+    .from(table)
+    .select("highlight_kind")
+    .limit(1);
+
+  if (!error) return true;
+
+  const message = `${error.message || ""} ${error.details || ""}`.toLowerCase();
+  if (message.includes("highlight_kind") || message.includes("column")) {
+    console.warn("Supabase table is missing highlight_kind. Run the updated supabase/schema.sql to save cell colours online.");
+    return false;
+  }
+
+  throw error;
+}
+
+function withoutHighlightKind(node) {
+  const { highlight_kind, ...legacyNode } = node;
+  return legacyNode;
 }
 
 async function loadNodes() {
@@ -140,6 +164,9 @@ async function saveAllNodes(nodes) {
 
   if (!client) return clean;
 
+  const supportsHighlightKind = await tableSupportsHighlightKind(client, table);
+  const rows = supportsHighlightKind ? clean : clean.map(withoutHighlightKind);
+
   const { error: deleteError } = await client
     .from(table)
     .delete()
@@ -150,10 +177,10 @@ async function saveAllNodes(nodes) {
     throw deleteError;
   }
 
-  if (clean.length) {
+  if (rows.length) {
     const { error: insertError } = await client
       .from(table)
-      .insert(clean);
+      .insert(rows);
 
     if (insertError) {
       console.error("Supabase insert failed:", insertError);

@@ -7,6 +7,12 @@ import { requireOnlyMe } from "./auth/only-me-guard.js";
 
 await requireOnlyMe();
 
+const highlightLabels = {
+  blunder: "Blunder",
+  great: "Great move",
+  brilliant: "Brilliant"
+};
+
 function pathFor(node) {
   const path = [];
   let currentNode = node;
@@ -17,14 +23,27 @@ function pathFor(node) {
   return path.join("  ");
 }
 
+function highlightLabel(kind) {
+  return highlightLabels[kind] || "";
+}
+
+function highlightBadgeHtml(kind) {
+  const label = highlightLabel(kind);
+  return label ? `<span class="mark-badge mark-${kind}">${label}</span>` : "";
+}
+
 function escapeHtml(str) {
   return String(str).replace(/[&<>'"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[ch]));
 }
 
 function cardHtml(node) {
   const tags = (node.tags || []).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join(" ");
+  const highlight = node.highlight_kind || "";
   return `
-    <div class="card-move">${escapeHtml(node.move)}</div>
+    <div class="card-move-line">
+      <div class="card-move">${escapeHtml(node.move)}</div>
+      ${highlightBadgeHtml(highlight)}
+    </div>
     <div class="card-title">${escapeHtml(node.title || "Untitled move")}</div>
     <div class="card-path">${escapeHtml(pathFor(node))}</div>
     <div class="card-tags">${tags}</div>
@@ -42,15 +61,16 @@ function drawCard() {
   }
   current = cards[Math.floor(Math.random() * cards.length)];
   revealed = false;
-  box.className = "practice-card big hidden";
+  box.className = `practice-card big hidden ${current.highlight_kind ? `card-${current.highlight_kind}` : ""}`.trim();
   box.innerHTML = cardHtml(current);
   $("revealBtn").textContent = "Reveal explanation";
 }
 
 $("revealBtn").addEventListener("click", () => {
   if (!current) return;
+  const highlightClass = current.highlight_kind ? ` card-${current.highlight_kind}` : "";
   revealed = !revealed;
-  $("randomCard").className = revealed ? "practice-card big" : "practice-card big hidden";
+  $("randomCard").className = revealed ? `practice-card big${highlightClass}` : `practice-card big hidden${highlightClass}`;
   $("revealBtn").textContent = revealed ? "Hide explanation" : "Reveal explanation";
 });
 

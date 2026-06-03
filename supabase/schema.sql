@@ -7,10 +7,15 @@ create table if not exists opening_nodes (
   move text not null,
   title text,
   explanation text,
+  highlight_kind text default '',
   tags text[] default '{}',
   is_practice_card boolean default true,
   created_at timestamptz default now()
 );
+
+-- Upgrade older tables created before coloured move highlights were added.
+alter table opening_nodes
+add column if not exists highlight_kind text default '';
 
 alter table opening_nodes enable row level security;
 
