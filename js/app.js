@@ -15,6 +15,10 @@ function children(parentId) {
   return nodes.filter(n => n.parent_id === parentId);
 }
 
+function childCount(nodeId) {
+  return children(nodeId).length;
+}
+
 function pathFor(node) {
   const path = [];
   let current = node;
@@ -31,22 +35,35 @@ function renderStats() {
   $("lineCount").textContent = nodes.filter(n => !n.parent_id).length;
 }
 
-function renderTree(parentId = null, depth = 0) {
-  return children(parentId).map(node => {
-    const tags = (node.tags || []).slice(0, 3).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join("");
-    return `
+function renderTreeRows(parentId = null, depth = 0) {
+  return children(parentId).flatMap(node => {
+    const tags = (node.tags || [])
+      .slice(0, 2)
+      .map(t => `<span class="tag">${escapeHtml(t)}</span>`)
+      .join("");
+    const count = childCount(node.id);
+
+    const row = `
       <div class="tree-node" style="--depth:${depth}">
         <button class="node-button ${node.id === selectedId ? "active" : ""}" data-id="${node.id}">
-          <span>
-            <strong>${escapeHtml(node.move)}</strong>
-            <div class="node-path">${escapeHtml(node.title || "No title yet")}</div>
-            <div class="node-tags">${tags}</div>
+          <span class="node-indent" aria-hidden="true"></span>
+          <span class="node-content">
+            <span class="node-topline">
+              <strong class="move-san">${escapeHtml(node.move)}</strong>
+              ${count ? `<span class="child-count">${count}</span>` : ""}
+            </span>
+            <span class="node-title">${escapeHtml(node.title || "No title yet")}</span>
+            ${tags ? `<span class="node-tags">${tags}</span>` : ""}
           </span>
-          <span>${children(node.id).length ? "▾" : ""}</span>
         </button>
-        ${renderTree(node.id, depth + 1)}
       </div>`;
-  }).join("");
+
+    return [row, ...renderTreeRows(node.id, depth + 1)];
+  });
+}
+
+function renderTree() {
+  return renderTreeRows().join("");
 }
 
 function paint() {
