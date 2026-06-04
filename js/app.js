@@ -4,7 +4,6 @@ await requireOnlyMe();
 
 let nodes = [];
 let selectedId = null;
-let expandedIds = new Set();
 
 const $ = id => document.getElementById(id);
 const treeEl = $("tree");
@@ -24,34 +23,30 @@ function childCount(nodeId) {
   return children(nodeId).length;
 }
 
-function descendantsOf(nodeId) {
-  return children(nodeId).flatMap(child => [child.id, ...descendantsOf(child.id)]);
+function nodeById(id) {
+  return nodes.find(n => n.id === id) || null;
 }
 
-function closeDescendants(nodeId) {
-  descendantsOf(nodeId).forEach(id => expandedIds.delete(id));
+function currentNode() {
+  return selectedId ? nodeById(selectedId) : null;
 }
 
-function toggleExpanded(nodeId) {
-  if (!childCount(nodeId)) return;
-
-  if (expandedIds.has(nodeId)) {
-    expandedIds.delete(nodeId);
-    closeDescendants(nodeId);
-  } else {
-    expandedIds.add(nodeId);
-    closeDescendants(nodeId);
-  }
-}
-
-function pathFor(node) {
+function pathNodesFor(node) {
   const path = [];
   let current = node;
   while (current) {
-    path.unshift(current.move);
-    current = nodes.find(n => n.id === current.parent_id);
+    path.unshift(current);
+    current = nodeById(current.parent_id);
   }
-  return path.join("  ");
+  return path;
+}
+
+function pathFor(node) {
+  return pathNodesFor(node).map(n => n.move).join("  ");
+}
+
+function visibleChoices() {
+  return children(selectedId || null);
 }
 
 function highlightLabel(kind) {
@@ -155,7 +150,6 @@ async function splitCompoundMovesOnce() {
 
   await OpeningDB.saveAllNodes(migrated);
   selectedId = null;
-  expandedIds.clear();
   await refresh();
 
   alert(`Done. Split ${splitNodeCount} move cell(s) and created ${addedNodeCount} extra child node(s).`);
@@ -167,53 +161,83 @@ function renderStats() {
   $("lineCount").textContent = nodes.filter(n => !n.parent_id).length;
 }
 
-function renderTreeRows(parentId = null, depth = 0) {
-  return children(parentId).flatMap((node, siblingIndex) => {
+function renderBreadcrumb(path) {
+  if (!path.length) {
+    return `<div class="line-empty">Choose a root move to start exploring your repertoire.</div>`;
+  }
+
+  return path.map((node, index) => {
+    const active = node.id === selectedId ? "active" : "";
+    return `
+      <button class="line-chip ${active}" data-id="${node.id}" title="Jump back to this move">
+        <span>${escapeHtml(node.move)}</span>
+        ${highlightBadgeHtml(node.highlight_kind || "")}
+      </button>`;
+  }).join("");
+}
+
+function renderChoices() {
+  const current = currentNode();
+  const choices = visibleChoices();
+  const heading = current ? "Next moves from this position" : "Root moves";
+
+  const rows = choices.map((node, index) => {
     const tags = (node.tags || [])
-      .slice(0, 2)
+      .slice(0, 3)
       .map(t => `<span class="tag">${escapeHtml(t)}</span>`)
       .join("");
 
     const count = childCount(node.id);
-    const isExpanded = expandedIds.has(node.id);
     const highlight = node.highlight_kind || "";
     const highlightClass = highlight ? ` highlight-${highlight}` : "";
-    const siblingClass = siblingIndex % 2 === 0 ? "sibling-a" : "sibling-b";
+    const altClass = index % 2 === 0 ? "choice-a" : "choice-b";
 
-    const row = `
-      <div class="tree-node" style="--depth:${depth}">
-        <button class="node-button ${siblingClass}${highlightClass} ${node.id === selectedId ? "active" : ""}" data-id="${node.id}" aria-expanded="${count ? String(isExpanded) : "false"}">
-          <span class="node-indent" aria-hidden="true"></span>
-          <span class="node-content">
-            <span class="node-topline">
-              <span class="node-caret" aria-hidden="true">${count ? (isExpanded ? "▾" : "▸") : "•"}</span>
-              <strong class="move-san">${escapeHtml(node.move)}</strong>
-              ${count ? `<span class="child-count">${count}</span>` : ""}
-              ${highlightBadgeHtml(highlight)}
-            </span>
-            <span class="node-title">${escapeHtml(node.title || "No title yet")}</span>
-            ${tags ? `<span class="node-tags">${tags}</span>` : ""}
+    return `
+      <button class="choice-card ${altClass}${highlightClass}" data-id="${node.id}">
+        <span class="choice-index">${index + 1}</span>
+        <span class="choice-main">
+          <span class="choice-topline">
+            <strong class="move-san">${escapeHtml(node.move)}</strong>
+            ${count ? `<span class="child-count">${count}</span>` : ""}
+            ${highlightBadgeHtml(highlight)}
           </span>
-        </button>
-      </div>`;
+          <span class="node-title">${escapeHtml(node.title || "No title yet")}</span>
+          ${tags ? `<span class="node-tags">${tags}</span>` : ""}
+        </span>
+      </button>`;
+  }).join("");
 
-    const childRows = isExpanded ? renderTreeRows(node.id, depth + 1) : [];
-    return [row, ...childRows];
-  });
-}
+  return `
+    <section class="line-view">
+      <div class="line-block">
+        <div class="line-label">Current line</div>
+        <div class="line-strip">${renderBreadcrumb(current ? pathNodesFor(current) : [])}</div>
+      </div>
 
-function renderTree() {
-  return renderTreeRows().join("");
+      <div class="line-tools">
+        <button id="backLineBtn" class="tiny secondary" ${current ? "" : "disabled"}>← Back one move</button>
+        <button id="rootLineBtn" class="tiny secondary" ${current ? "" : "disabled"}>Root view</button>
+      </div>
+
+      <div class="choice-heading">
+        <h4>${heading}</h4>
+        <span>${choices.length} option${choices.length === 1 ? "" : "s"}</span>
+      </div>
+
+      <div class="choice-list">
+        ${rows || `<p class="muted">No child moves here yet. Add a child move from the editor.</p>`}
+      </div>
+    </section>`;
 }
 
 function paint() {
-  treeEl.innerHTML = renderTree() || `<p class="muted">No moves yet. Add your first root.</p>`;
+  treeEl.innerHTML = renderChoices();
   renderStats();
 }
 
 function selectNode(id, shouldPaint = true) {
   selectedId = id;
-  const node = nodes.find(n => n.id === id);
+  const node = nodeById(id);
   $("editorTitle").textContent = node ? `Editing ${node.move}` : "Select a move";
   $("deleteBtn").disabled = !node;
   $("addChildBtn").disabled = !node;
@@ -224,6 +248,20 @@ function selectNode(id, shouldPaint = true) {
   $("tagsInput").value = (node?.tags || []).join(", ");
   $("practiceInput").checked = node?.is_practice_card !== false;
   if (shouldPaint) paint();
+}
+
+function resetEditorForNewRoot() {
+  selectedId = null;
+  $("editorTitle").textContent = "New root move";
+  $("moveInput").value = "";
+  $("titleInput").value = "";
+  $("highlightInput").value = "";
+  $("explanationInput").value = "";
+  $("tagsInput").value = "";
+  $("practiceInput").checked = true;
+  $("deleteBtn").disabled = true;
+  $("addChildBtn").disabled = true;
+  paint();
 }
 
 function getFormNode(parentId = null, existingId = null) {
@@ -242,9 +280,9 @@ function getFormNode(parentId = null, existingId = null) {
 
 async function refresh() {
   nodes = await OpeningDB.loadNodes();
-  expandedIds = new Set([...expandedIds].filter(id => nodes.some(n => n.id === id)));
+  if (selectedId && !nodes.some(n => n.id === selectedId)) selectedId = null;
   paint();
-  if (selectedId && nodes.some(n => n.id === selectedId)) selectNode(selectedId);
+  if (selectedId) selectNode(selectedId, false);
 }
 
 function showRandomCard() {
@@ -281,7 +319,7 @@ function escapeHtml(str) {
 
 form.addEventListener("submit", async e => {
   e.preventDefault();
-  const existing = nodes.find(n => n.id === selectedId);
+  const existing = nodeById(selectedId);
   const node = getFormNode(existing?.parent_id || null, selectedId || null);
   await OpeningDB.upsertNode(node);
   selectedId = node.id;
@@ -289,27 +327,41 @@ form.addEventListener("submit", async e => {
 });
 
 treeEl.addEventListener("click", e => {
-  const btn = e.target.closest(".node-button");
-  if (!btn) return;
+  const chip = e.target.closest(".line-chip");
+  if (chip) {
+    selectNode(chip.dataset.id);
+    return;
+  }
 
-  const id = btn.dataset.id;
-  toggleExpanded(id);
-  selectNode(id);
+  const choice = e.target.closest(".choice-card");
+  if (choice) {
+    selectNode(choice.dataset.id);
+    return;
+  }
+
+  if (e.target.closest("#backLineBtn")) {
+    const current = currentNode();
+    selectedId = current?.parent_id || null;
+    if (selectedId) selectNode(selectedId);
+    else {
+      $("editorTitle").textContent = "Select a move";
+      $("deleteBtn").disabled = true;
+      $("addChildBtn").disabled = true;
+      paint();
+    }
+    return;
+  }
+
+  if (e.target.closest("#rootLineBtn")) {
+    selectedId = null;
+    $("editorTitle").textContent = "Select a move";
+    $("deleteBtn").disabled = true;
+    $("addChildBtn").disabled = true;
+    paint();
+  }
 });
 
-$("newRootBtn").addEventListener("click", () => {
-  selectedId = null;
-  $("editorTitle").textContent = "New root move";
-  $("moveInput").value = "";
-  $("titleInput").value = "";
-  $("highlightInput").value = "";
-  $("explanationInput").value = "";
-  $("tagsInput").value = "";
-  $("practiceInput").checked = true;
-  $("deleteBtn").disabled = true;
-  $("addChildBtn").disabled = true;
-  paint();
-});
+$("newRootBtn").addEventListener("click", resetEditorForNewRoot);
 
 $("addChildBtn").addEventListener("click", async () => {
   if (!selectedId) return;
@@ -328,17 +380,16 @@ $("addChildBtn").addEventListener("click", async () => {
   };
 
   await OpeningDB.upsertNode(child);
-  expandedIds.add(parentId);
   selectedId = child.id;
   await refresh();
 });
 
 $("deleteBtn").addEventListener("click", async () => {
   if (!selectedId || !confirm("Delete this move and all child lines?")) return;
-  await OpeningDB.deleteNodeAndChildren(selectedId);
-  expandedIds.delete(selectedId);
-  closeDescendants(selectedId);
-  selectedId = null;
+  const deleted = selectedId;
+  const deletedNode = nodeById(deleted);
+  selectedId = deletedNode?.parent_id || null;
+  await OpeningDB.deleteNodeAndChildren(deleted);
   await refresh();
 });
 
@@ -363,7 +414,6 @@ $("importInput").addEventListener("change", async e => {
   const imported = JSON.parse(text).map(OpeningDB.normalizeNode);
   await OpeningDB.saveAllNodes(imported);
   selectedId = null;
-  expandedIds.clear();
   await refresh();
 });
 
