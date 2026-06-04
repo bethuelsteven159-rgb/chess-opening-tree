@@ -6,7 +6,7 @@
   <title>GM Opening Tree</title>
   <meta name="theme-color" content="#111827" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="styles.css?v=5" />
+  <link rel="stylesheet" href="styles.css?v=6" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -104,7 +104,8 @@
       </div>
       <div class="utility-box">
         <h4>Import / Export</h4>
-        <button id="exportBtn" class="secondary full">Export JSON</button>
+        <button id="exportBtn" class="secondary full">Export JSON backup</button>
+        <button id="splitCompoundBtn" class="secondary full">Split compound moves</button>
         <label class="file-label">
           Import JSON
           <input id="importInput" type="file" accept="application/json" />
@@ -119,7 +120,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
-  <script type="module" src="./js/app.js?v=5"></script>
+  <script type="module" src="./js/app.js?v=6"></script>
   <script>
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js');
   </script>

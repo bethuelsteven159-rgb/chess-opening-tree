@@ -63,6 +63,104 @@ function highlightBadgeHtml(kind) {
   return label ? `<span class="mark-badge mark-${kind}">${label}</span>` : "";
 }
 
+function splitMoveParts(moveText) {
+  const text = String(moveText || "").trim();
+  if (!text) return [];
+
+  const regex = /\b(\d+)\s*(\.\.\.|\.)\s*([^\s]+)/g;
+  const matches = [...text.matchAll(regex)];
+
+  if (matches.length <= 1) return [text];
+
+  let leftover = text;
+  for (const match of matches) {
+    leftover = leftover.replace(match[0], " ");
+  }
+
+  if (leftover.trim()) return [text];
+
+  return matches.map(match => `${match[1]}${match[2]} ${match[3]}`);
+}
+
+function addMilliseconds(dateText, amount) {
+  const base = Date.parse(dateText || "");
+  const date = Number.isFinite(base) ? new Date(base + amount) : new Date(Date.now() + amount);
+  return date.toISOString();
+}
+
+function migrateSplitCompoundMoves(sourceNodes) {
+  const cleanNodes = sourceNodes.map(OpeningDB.normalizeNode);
+  const migrated = [];
+  let splitNodeCount = 0;
+  let addedNodeCount = 0;
+
+  const childrenOf = parentId => cleanNodes.filter(node => node.parent_id === parentId);
+
+  function cloneForPart(original, part, id, parentId, partIndex) {
+    return {
+      ...original,
+      id,
+      parent_id: parentId,
+      move: part,
+      title: original.title || "",
+      explanation: original.explanation || "",
+      highlight_kind: original.highlight_kind || "",
+      tags: [...(original.tags || [])],
+      is_practice_card: original.is_practice_card !== false,
+      created_at: addMilliseconds(original.created_at, partIndex)
+    };
+  }
+
+  function visit(node, newParentId) {
+    const parts = splitMoveParts(node.move);
+    let currentParentId = newParentId;
+    let lastId = node.id;
+
+    if (parts.length > 1) {
+      splitNodeCount += 1;
+      addedNodeCount += parts.length - 1;
+    }
+
+    parts.forEach((part, partIndex) => {
+      const id = partIndex === 0 ? node.id : crypto.randomUUID();
+      const newNode = cloneForPart(node, part, id, currentParentId, partIndex);
+      migrated.push(newNode);
+      currentParentId = id;
+      lastId = id;
+    });
+
+    childrenOf(node.id).forEach(child => visit(child, lastId));
+  }
+
+  childrenOf(null).forEach(root => visit(root, null));
+
+  return { migrated, splitNodeCount, addedNodeCount };
+}
+
+async function splitCompoundMovesOnce() {
+  const answer = confirm(
+    "This will split moves like '1... e5 2.Nf3' into separate child moves.\n\n" +
+    "Please export a JSON backup first. Continue now?"
+  );
+
+  if (!answer) return;
+
+  const currentNodes = await OpeningDB.loadNodes();
+  const { migrated, splitNodeCount, addedNodeCount } = migrateSplitCompoundMoves(currentNodes);
+
+  if (!splitNodeCount) {
+    alert("No compound moves were found. Nothing changed.");
+    return;
+  }
+
+  await OpeningDB.saveAllNodes(migrated);
+  selectedId = null;
+  expandedIds.clear();
+  await refresh();
+
+  alert(`Done. Split ${splitNodeCount} move cell(s) and created ${addedNodeCount} extra child node(s).`);
+}
+
 function renderStats() {
   $("nodeCount").textContent = nodes.length;
   $("cardCount").textContent = nodes.filter(n => n.is_practice_card).length;
@@ -70,7 +168,7 @@ function renderStats() {
 }
 
 function renderTreeRows(parentId = null, depth = 0) {
-  return children(parentId).flatMap(node => {
+  return children(parentId).flatMap((node, siblingIndex) => {
     const tags = (node.tags || [])
       .slice(0, 2)
       .map(t => `<span class="tag">${escapeHtml(t)}</span>`)
@@ -80,10 +178,11 @@ function renderTreeRows(parentId = null, depth = 0) {
     const isExpanded = expandedIds.has(node.id);
     const highlight = node.highlight_kind || "";
     const highlightClass = highlight ? ` highlight-${highlight}` : "";
+    const siblingClass = siblingIndex % 2 === 0 ? "sibling-a" : "sibling-b";
 
     const row = `
       <div class="tree-node" style="--depth:${depth}">
-        <button class="node-button${highlightClass} ${node.id === selectedId ? "active" : ""}" data-id="${node.id}" aria-expanded="${count ? String(isExpanded) : "false"}">
+        <button class="node-button ${siblingClass}${highlightClass} ${node.id === selectedId ? "active" : ""}" data-id="${node.id}" aria-expanded="${count ? String(isExpanded) : "false"}">
           <span class="node-indent" aria-hidden="true"></span>
           <span class="node-content">
             <span class="node-topline">
@@ -254,6 +353,8 @@ $("exportBtn").addEventListener("click", () => {
   a.click();
   URL.revokeObjectURL(a.href);
 });
+
+$("splitCompoundBtn")?.addEventListener("click", splitCompoundMovesOnce);
 
 $("importInput").addEventListener("change", async e => {
   const file = e.target.files[0];

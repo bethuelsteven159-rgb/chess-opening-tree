@@ -1,4 +1,4 @@
-const CACHE_NAME = "gm-opening-tree-v5";
+const CACHE_NAME = "gm-opening-tree-v6";
 const ASSETS = [
   "./",
   "index.html",
