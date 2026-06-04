@@ -1,3 +1,80 @@
-<button id="googleLoginBtn">Continue with Google</button>
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GM Opening Tree - Login</title>
+  <meta name="theme-color" content="#08111d" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
+  </script>
+  <link rel="stylesheet" href="styles.css?v=11" />
+</head>
+<body class="auth-page">
+  <div class="texture-grid"></div>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
 
-<script type="module" src="./js/auth/login.js?v=3"></script>
+  <main class="page-shell auth-shell">
+    <section class="panel auth-panel">
+      <div class="topbar auth-topbar">
+        <div class="brand">
+          <span class="logo">♟</span>
+          <div>
+            <h1>GM Opening Tree</h1>
+            <p>Build. Train. Repair.</p>
+          </div>
+        </div>
+
+        <div class="nav-actions">
+          <button id="themeToggleBtn" class="button button-secondary button-tiny" type="button">Light mode</button>
+          <button id="logoutBtn" class="button button-secondary button-tiny" type="button">Logout</button>
+        </div>
+      </div>
+
+      <div class="auth-grid">
+        <div class="auth-copy">
+          <p class="eyebrow">Private study system</p>
+          <h2>Turn your opening prep into a repeatable study loop.</h2>
+          <p>
+            The board-first trainer drills recall from positions, preferred moves lock in your repertoire choices,
+            and the repair journal converts every painful loss into a concrete fix.
+          </p>
+
+          <div class="feature-list">
+            <article class="feature-pill">
+              <strong>Preferred lines</strong>
+              <span>Tell the trainer which branch belongs to your repertoire.</span>
+            </article>
+            <article class="feature-pill">
+              <strong>Board-first recall</strong>
+              <span>Answer from the position instead of reading a move list.</span>
+            </article>
+            <article class="feature-pill">
+              <strong>Repair loops</strong>
+              <span>Capture mistake, lesson, and repair until the weakness is solved.</span>
+            </article>
+          </div>
+        </div>
+
+        <div class="auth-card">
+          <p class="eyebrow">Owner access</p>
+          <h3>Continue with Google</h3>
+          <p class="muted">
+            This workspace only opens for the allowed account. Sign in with the Google address already linked to your Supabase auth project.
+          </p>
+
+          <button id="googleLoginBtn" class="button button-primary auth-button" type="button">Continue with Google</button>
+          <p id="loginStatus" class="panel-note">Only the approved email can enter this study workspace.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./js/auth/login.js?v=11"></script>
+</body>
+</html>

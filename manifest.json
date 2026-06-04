@@ -3,9 +3,9 @@
   "short_name": "OpeningTree",
   "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#0a1020",
-  "theme_color": "#111827",
-  "description": "A chess opening tree and random practice card app.",
+  "background_color": "#08111d",
+  "theme_color": "#08111d",
+  "description": "A private chess opening tree with board-first training and repair loops.",
   "icons": [
     {
       "src": "assets/icon.svg",
@@ -15,9 +15,9 @@
   ],
   "shortcuts": [
     {
-      "name": "Random Card",
-      "short_name": "Card",
-      "description": "Open a random opening practice card.",
+      "name": "Random Review",
+      "short_name": "Review",
+      "description": "Open a shuffled opening review card.",
       "url": "random.html",
       "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
     }

@@ -1,4 +1,8 @@
-const STORAGE_KEY = "gm_opening_tree_local_v1";
+const LEGACY_NODE_STORAGE_KEY = "gm_opening_tree_local_v1";
+const NODE_STORAGE_KEY = "gm_opening_tree_local_v2";
+const REPAIR_STORAGE_KEY = "gm_opening_tree_repairs_v1";
+
+const supportCache = new Map();
 
 const seedNodes = [
   {
@@ -6,27 +10,30 @@ const seedNodes = [
     parent_id: null,
     move: "1.e4",
     title: "King's Pawn Opening",
-    explanation: "Claim the center, open lines for the queen and bishop, and invite open tactical games.",
+    explanation: "Claim the center, open the bishop and queen, and steer the repertoire toward active open games.",
     tags: ["White", "center", "classical"],
-    is_practice_card: true
+    is_practice_card: true,
+    is_preferred: true
   },
   {
     id: crypto.randomUUID(),
     parent_id: null,
     move: "1...e5",
     title: "Open Game vs 1.e4",
-    explanation: "Meet central control with central control. Learn classical development and direct piece activity.",
+    explanation: "Meet central control with central control and keep your development fast and direct.",
     tags: ["Black", "1.e4", "classical"],
-    is_practice_card: true
+    is_practice_card: true,
+    is_preferred: true
   },
   {
     id: crypto.randomUUID(),
     parent_id: null,
     move: "1...d5",
-    title: "Queen's Gambit Declined / Slav family",
-    explanation: "A solid answer to 1.d4 structures. Focus on central tension and piece coordination.",
+    title: "Queen's Gambit family",
+    explanation: "A practical answer to 1.d4 that keeps the structure healthy and the plans easy to remember.",
     tags: ["Black", "1.d4", "structure"],
-    is_practice_card: true
+    is_practice_card: true,
+    is_preferred: false
   }
 ];
 
@@ -35,42 +42,50 @@ seedNodes.push(
     id: crypto.randomUUID(),
     parent_id: seedNodes[0].id,
     move: "2.Nf3",
-    title: "Develop and attack e5",
-    explanation: "Develop with tempo against e5 ideas. Prepare quick castling and keep the center flexible.",
+    title: "Develop and pressure e5",
+    explanation: "Natural development, fast castling, and flexible central plans.",
     tags: ["development"],
-    is_practice_card: true
+    is_practice_card: true,
+    is_preferred: false
   },
   {
     id: crypto.randomUUID(),
     parent_id: seedNodes[0].id,
     move: "2.Bc4",
     title: "Italian setup idea",
-    explanation: "The bishop eyes f7 and supports fast development. Plans often include c3-d4, Re1, and calm pressure.",
+    explanation: "Eye f7, build with c3 and d4, and keep the kingside pieces flowing naturally.",
     tags: ["Italian", "bishop"],
-    is_practice_card: true
+    is_practice_card: true,
+    is_preferred: true
   },
   {
     id: crypto.randomUUID(),
     parent_id: seedNodes[1].id,
     move: "2.Nf3",
-    title: "Allow classical open games",
-    explanation: "Expect Italian, Scotch, or Ruy Lopez structures. Use these games to train calculation.",
+    title: "Classical open games",
+    explanation: "Expect Italian, Scotch, or Ruy Lopez structures and sharpen your tactical awareness.",
     tags: ["open games"],
-    is_practice_card: true
+    is_practice_card: true,
+    is_preferred: true
   },
   {
     id: crypto.randomUUID(),
     parent_id: seedNodes[2].id,
     move: "2.c4",
     title: "Queen's Gambit structures",
-    explanation: "Fight for the center from the side. Learn when to hold, release, or challenge central tension.",
+    explanation: "Challenge the center from the side and learn when to hold or release the pawn tension.",
     tags: ["QGD", "Slav"],
-    is_practice_card: true
+    is_practice_card: true,
+    is_preferred: true
   }
 );
 
 function getClient() {
   const cfg = window.APP_CONFIG || {};
+
+  if (window.GM_SUPABASE_CLIENT) {
+    return window.GM_SUPABASE_CLIENT;
+  }
 
   const ready =
     cfg.SUPABASE_URL &&
@@ -81,10 +96,12 @@ function getClient() {
 
   if (!ready) return null;
 
-  return window.supabase.createClient(
-    cfg.SUPABASE_URL,
-    cfg.SUPABASE_ANON_KEY
-  );
+  window.GM_SUPABASE_CLIENT = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  return window.GM_SUPABASE_CLIENT;
+}
+
+function normalizeTags(tags) {
+  return Array.isArray(tags) ? tags.map(tag => String(tag || "").trim()).filter(Boolean) : [];
 }
 
 function normalizeNode(node) {
@@ -95,33 +112,124 @@ function normalizeNode(node) {
     title: node.title || "",
     explanation: node.explanation || "",
     highlight_kind: ["blunder", "great", "brilliant"].includes(node.highlight_kind) ? node.highlight_kind : "",
-    tags: Array.isArray(node.tags) ? node.tags : [],
+    tags: normalizeTags(node.tags),
     is_practice_card: node.is_practice_card !== false,
+    is_preferred: node.is_preferred === true,
     created_at: node.created_at || new Date().toISOString()
   };
 }
 
+function normalizeRepairItem(item) {
+  return {
+    id: item.id || crypto.randomUUID(),
+    related_node_id: item.related_node_id || null,
+    position_path: String(item.position_path || "").trim(),
+    mistake: String(item.mistake || "").trim(),
+    lesson: String(item.lesson || "").trim(),
+    repair: String(item.repair || "").trim(),
+    status: item.status === "solved" ? "solved" : "needs_work",
+    created_at: item.created_at || new Date().toISOString()
+  };
+}
 
-async function tableSupportsHighlightKind(client, table) {
-  const { error } = await client
-    .from(table)
-    .select("highlight_kind")
-    .limit(1);
+function readLocalJson(key) {
+  const raw = localStorage.getItem(key);
+  return raw ? JSON.parse(raw) : null;
+}
 
-  if (!error) return true;
+function writeLocalJson(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
 
-  const message = `${error.message || ""} ${error.details || ""}`.toLowerCase();
-  if (message.includes("highlight_kind") || message.includes("column")) {
-    console.warn("Supabase table is missing highlight_kind. Run the updated supabase/schema.sql to save cell colours online.");
+function loadLocalNodes() {
+  const raw = readLocalJson(NODE_STORAGE_KEY) || readLocalJson(LEGACY_NODE_STORAGE_KEY);
+
+  if (!raw) {
+    const cleanSeed = seedNodes.map(normalizeNode);
+    writeLocalJson(NODE_STORAGE_KEY, cleanSeed);
+    return cleanSeed;
+  }
+
+  const clean = raw.map(normalizeNode);
+  writeLocalJson(NODE_STORAGE_KEY, clean);
+  return clean;
+}
+
+function loadLocalRepairs() {
+  const raw = readLocalJson(REPAIR_STORAGE_KEY) || [];
+  const clean = raw.map(normalizeRepairItem);
+  writeLocalJson(REPAIR_STORAGE_KEY, clean);
+  return clean;
+}
+
+function describeError(error) {
+  return `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`.toLowerCase();
+}
+
+function isMissingColumnError(error, columnName) {
+  const text = describeError(error);
+  return text.includes(columnName.toLowerCase()) || (text.includes("column") && text.includes("schema cache"));
+}
+
+function isMissingTableError(error, tableName) {
+  const text = describeError(error);
+  return text.includes(tableName.toLowerCase()) || text.includes("does not exist") || text.includes("relation");
+}
+
+async function supportsColumn(client, table, columnName) {
+  const cacheKey = `${table}:${columnName}`;
+  if (supportCache.has(cacheKey)) return supportCache.get(cacheKey);
+
+  const { error } = await client.from(table).select(columnName).limit(1);
+
+  if (!error) {
+    supportCache.set(cacheKey, true);
+    return true;
+  }
+
+  if (isMissingColumnError(error, columnName)) {
+    console.warn(`Supabase table ${table} is missing ${columnName}. Run the updated supabase/schema.sql to sync the new app fields.`);
+    supportCache.set(cacheKey, false);
     return false;
   }
 
   throw error;
 }
 
-function withoutHighlightKind(node) {
-  const { highlight_kind, ...legacyNode } = node;
-  return legacyNode;
+async function openingNodeSupport(client, table) {
+  const [highlightKind, isPreferred] = await Promise.all([
+    supportsColumn(client, table, "highlight_kind"),
+    supportsColumn(client, table, "is_preferred")
+  ]);
+
+  return { highlightKind, isPreferred };
+}
+
+function stripUnsupportedNodeFields(node, support) {
+  const row = { ...node };
+  if (!support.highlightKind) delete row.highlight_kind;
+  if (!support.isPreferred) delete row.is_preferred;
+  return row;
+}
+
+async function repairTableAvailable(client, table) {
+  const cacheKey = `table:${table}`;
+  if (supportCache.has(cacheKey)) return supportCache.get(cacheKey);
+
+  const { error } = await client.from(table).select("id").limit(1);
+
+  if (!error) {
+    supportCache.set(cacheKey, true);
+    return true;
+  }
+
+  if (isMissingTableError(error, table)) {
+    console.warn(`Supabase table ${table} does not exist yet. Repairs will stay in localStorage until you run the updated supabase/schema.sql.`);
+    supportCache.set(cacheKey, false);
+    return false;
+  }
+
+  throw error;
 }
 
 async function loadNodes() {
@@ -140,32 +248,24 @@ async function loadNodes() {
     }
 
     const clean = (data || []).map(normalizeNode);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+    writeLocalJson(NODE_STORAGE_KEY, clean);
     return clean;
   }
 
-  const raw = localStorage.getItem(STORAGE_KEY);
-
-  if (!raw) {
-    const cleanSeed = seedNodes.map(normalizeNode);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanSeed));
-    return cleanSeed;
-  }
-
-  return JSON.parse(raw).map(normalizeNode);
+  return loadLocalNodes();
 }
 
 async function saveAllNodes(nodes) {
   const clean = nodes.map(normalizeNode);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+  writeLocalJson(NODE_STORAGE_KEY, clean);
 
   const client = getClient();
   const table = window.APP_CONFIG?.TABLE_NAME || "opening_nodes";
 
   if (!client) return clean;
 
-  const supportsHighlightKind = await tableSupportsHighlightKind(client, table);
-  const rows = supportsHighlightKind ? clean : clean.map(withoutHighlightKind);
+  const support = await openingNodeSupport(client, table);
+  const rows = clean.map(node => stripUnsupportedNodeFields(node, support));
 
   const { error: deleteError } = await client
     .from(table)
@@ -178,9 +278,7 @@ async function saveAllNodes(nodes) {
   }
 
   if (rows.length) {
-    const { error: insertError } = await client
-      .from(table)
-      .insert(rows);
+    const { error: insertError } = await client.from(table).insert(rows);
 
     if (insertError) {
       console.error("Supabase insert failed:", insertError);
@@ -195,13 +293,9 @@ async function upsertNode(node) {
   const nodes = await loadNodes();
   const clean = normalizeNode(node);
 
-  const index = nodes.findIndex(n => n.id === clean.id);
-
-  if (index >= 0) {
-    nodes[index] = clean;
-  } else {
-    nodes.push(clean);
-  }
+  const index = nodes.findIndex(entry => entry.id === clean.id);
+  if (index >= 0) nodes[index] = clean;
+  else nodes.push(clean);
 
   await saveAllNodes(nodes);
   return clean;
@@ -212,13 +306,96 @@ async function deleteNodeAndChildren(id) {
 
   const childrenOf = parentId =>
     nodes
-      .filter(n => n.parent_id === parentId)
-      .flatMap(n => [n.id, ...childrenOf(n.id)]);
+      .filter(node => node.parent_id === parentId)
+      .flatMap(node => [node.id, ...childrenOf(node.id)]);
 
   const removeIds = new Set([id, ...childrenOf(id)]);
-  const kept = nodes.filter(n => !removeIds.has(n.id));
+  const kept = nodes.filter(node => !removeIds.has(node.id));
 
   await saveAllNodes(kept);
+
+  const repairs = await loadRepairItems();
+  const filteredRepairs = repairs.map(repair =>
+    removeIds.has(repair.related_node_id)
+      ? { ...repair, related_node_id: null }
+      : repair
+  );
+  await saveAllRepairItems(filteredRepairs);
+
+  return kept;
+}
+
+async function loadRepairItems() {
+  const client = getClient();
+  const table = window.APP_CONFIG?.REPAIR_TABLE_NAME || "repair_items";
+
+  if (client && await repairTableAvailable(client, table)) {
+    const { data, error } = await client
+      .from(table)
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Supabase repair load failed:", error);
+      throw error;
+    }
+
+    const clean = (data || []).map(normalizeRepairItem);
+    writeLocalJson(REPAIR_STORAGE_KEY, clean);
+    return clean;
+  }
+
+  return loadLocalRepairs();
+}
+
+async function saveAllRepairItems(items) {
+  const clean = items.map(normalizeRepairItem);
+  writeLocalJson(REPAIR_STORAGE_KEY, clean);
+
+  const client = getClient();
+  const table = window.APP_CONFIG?.REPAIR_TABLE_NAME || "repair_items";
+
+  if (!client || !(await repairTableAvailable(client, table))) {
+    return clean;
+  }
+
+  const { error: deleteError } = await client
+    .from(table)
+    .delete()
+    .neq("id", "00000000-0000-0000-0000-000000000000");
+
+  if (deleteError) {
+    console.error("Supabase repair delete failed:", deleteError);
+    throw deleteError;
+  }
+
+  if (clean.length) {
+    const { error: insertError } = await client.from(table).insert(clean);
+    if (insertError) {
+      console.error("Supabase repair insert failed:", insertError);
+      throw insertError;
+    }
+  }
+
+  return clean;
+}
+
+async function upsertRepairItem(item) {
+  const repairs = await loadRepairItems();
+  const clean = normalizeRepairItem(item);
+
+  const index = repairs.findIndex(entry => entry.id === clean.id);
+  if (index >= 0) repairs[index] = clean;
+  else repairs.unshift(clean);
+
+  await saveAllRepairItems(repairs);
+  return clean;
+}
+
+async function deleteRepairItem(id) {
+  const repairs = await loadRepairItems();
+  const kept = repairs.filter(entry => entry.id !== id);
+  await saveAllRepairItems(kept);
   return kept;
 }
 
@@ -227,5 +404,10 @@ window.OpeningDB = {
   saveAllNodes,
   upsertNode,
   deleteNodeAndChildren,
-  normalizeNode
+  normalizeNode,
+  loadRepairItems,
+  saveAllRepairItems,
+  upsertRepairItem,
+  deleteRepairItem,
+  normalizeRepairItem
 };

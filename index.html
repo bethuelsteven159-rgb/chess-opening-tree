@@ -1,19 +1,27 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GM Opening Tree</title>
-  <meta name="theme-color" content="#111827" />
+  <meta name="theme-color" content="#08111d" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="styles.css?v=7" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
+  </script>
+  <link rel="stylesheet" href="styles.css?v=11" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 </head>
-<body>
+<body class="app-page">
+  <div class="texture-grid"></div>
   <div class="bg-orb orb-a"></div>
   <div class="bg-orb orb-b"></div>
 
-  <header class="hero">
+  <header class="page-shell site-header">
     <nav class="topbar">
       <div class="brand">
         <span class="logo">♟</span>
@@ -22,35 +30,64 @@
           <p>Your repertoire cockpit</p>
         </div>
       </div>
+
       <div class="nav-actions">
-        <a class="ghost" href="random.html">Random Cards</a>
-        <button id="syncBtn" class="primary">Sync</button>
+        <a class="button button-ghost button-tiny" href="random.html">Random Cards</a>
+        <button id="importBtn" class="button button-ghost button-tiny" type="button">Import JSON</button>
+        <button id="exportBtn" class="button button-ghost button-tiny" type="button">Export JSON</button>
+        <button id="splitCompoundBtn" class="button button-ghost button-tiny" type="button">Split Moves</button>
+        <button id="themeToggleBtn" class="button button-secondary button-tiny" type="button">Light mode</button>
+        <button id="syncBtn" class="button button-primary button-tiny" type="button">Sync</button>
+        <button id="logoutBtn" class="button button-secondary button-tiny" type="button">Logout</button>
       </div>
     </nav>
+
+    <input id="importInput" class="hidden-file-input" type="file" accept="application/json" />
 
     <section class="hero-grid">
       <div class="hero-copy">
         <p class="eyebrow">Chess road to GM</p>
-        <h2>Build openings that become weapons, not memory fog.</h2>
-        <p>Add moves, attach explanations, tag ideas, then train from random cards until your repertoire lives in your bones.</p>
+        <h2>Build the line, train the recall, repair the loss.</h2>
+        <p>
+          Preferred moves tell the trainer which answer belongs to your repertoire.
+          The board keeps you anchored in the position. The repair loop turns every bad game into a precise fix.
+        </p>
       </div>
-      <div class="stats-card">
-        <div><strong id="nodeCount">0</strong><span>Moves</span></div>
-        <div><strong id="cardCount">0</strong><span>Cards</span></div>
-        <div><strong id="lineCount">0</strong><span>Root lines</span></div>
+
+      <div class="hero-stat-grid">
+        <article class="stat-card">
+          <span>Moves</span>
+          <strong id="nodeCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Root lines</span>
+          <strong id="lineCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Trainer positions</span>
+          <strong id="trainerCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Preferred moves</span>
+          <strong id="preferredCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Repairs due</span>
+          <strong id="repairCount">0</strong>
+        </article>
       </div>
     </section>
   </header>
 
-  <section class="live-board-shell">
+  <section class="page-shell live-board-shell">
     <div class="panel live-board-panel">
       <div class="live-board-heading">
         <div>
           <p class="eyebrow">Live board</p>
           <h3 id="liveBoardTitle">Root position</h3>
-          <p id="liveBoardSubtitle" class="muted">The board follows the move you select in Line Explorer.</p>
+          <p id="liveBoardSubtitle" class="muted">The live board follows the move you select in Line Explorer.</p>
         </div>
-        <div id="liveBoardMeta" class="board-meta-pill">White to move</div>
+        <div id="liveBoardMeta" class="status-pill">White to move</div>
       </div>
 
       <div class="live-board-layout">
@@ -65,7 +102,7 @@
             <article class="board-detail-card">
               <span class="board-detail-label">Current move</span>
               <strong id="liveMoveValue">Root view</strong>
-              <p id="liveMoveCaption">Choose any move in the explorer to jump the position here.</p>
+              <p id="liveMoveCaption">Choose a move in the explorer to jump the position here.</p>
             </article>
 
             <article class="board-detail-card">
@@ -86,19 +123,25 @@
     </div>
   </section>
 
-  <main class="app-shell">
+  <main class="page-shell workspace-shell">
     <aside class="panel tree-panel">
       <div class="panel-heading">
-        <h3>Line Explorer</h3>
-        <button id="newRootBtn" class="tiny">+ Root</button>
+        <div>
+          <h3>Line Explorer</h3>
+          <p class="subheading">Preferred moves are the answers the trainer expects when a position branches.</p>
+        </div>
+        <button id="newRootBtn" class="button button-secondary button-tiny" type="button">New root line</button>
       </div>
       <div id="tree" class="tree"></div>
     </aside>
 
     <section class="panel editor-panel">
       <div class="panel-heading">
-        <h3 id="editorTitle">Select a move</h3>
-        <button id="deleteBtn" class="danger tiny" disabled>Delete</button>
+        <div>
+          <h3 id="editorTitle">Select a move</h3>
+          <p id="editorContext" class="subheading">Create a root move or select an existing move to edit its details.</p>
+        </div>
+        <button id="deleteBtn" class="button button-danger button-tiny" type="button" disabled>Delete</button>
       </div>
 
       <form id="moveForm" class="move-form">
@@ -106,68 +149,181 @@
           Move SAN
           <input id="moveInput" placeholder="e4, Nf3, Bb5..." required />
         </label>
+
         <label>
           Title
-          <input id="titleInput" placeholder="Italian Game, Main Plan..." />
+          <input id="titleInput" placeholder="Italian main line, anti-Berlin plan..." />
         </label>
+
         <label>
           Move highlight
           <select id="highlightInput">
             <option value="">Normal / no highlight</option>
             <option value="blunder">Blunder</option>
             <option value="great">Great move</option>
-            <option value="brilliant">Brilliant move</option>
+            <option value="brilliant">Brilliant</option>
           </select>
         </label>
+
         <label>
           Explanation
-          <textarea id="explanationInput" rows="8" placeholder="What is the point of this move? Piece placement, pawn breaks, traps, plans..."></textarea>
+          <textarea id="explanationInput" rows="7" placeholder="Why is this move good? Plans, structures, tactics, move-order points, typical middlegame ideas..."></textarea>
         </label>
+
         <label>
           Tags
-          <input id="tagsInput" placeholder="Italian, development, center, attack" />
+          <input id="tagsInput" placeholder="Italian, center, initiative, kingside..." />
         </label>
-        <label class="check-row">
-          <input id="practiceInput" type="checkbox" checked />
-          Use as random practice card
-        </label>
+
+        <div class="form-grid two-up">
+          <label class="check-row">
+            <input id="preferredInput" type="checkbox" />
+            <span>
+              Preferred repertoire move
+              <small>The trainer will favor this move when the position has multiple children.</small>
+            </span>
+          </label>
+
+          <label class="check-row">
+            <input id="practiceInput" type="checkbox" checked />
+            <span>
+              Use in trainer rotation
+              <small>Turn this move into a recall prompt for the board-first trainer.</small>
+            </span>
+          </label>
+        </div>
+
         <div class="form-actions">
-          <button class="primary" type="submit">Save move</button>
-          <button id="addChildBtn" type="button" class="secondary" disabled>+ Add child move</button>
+          <button class="button button-primary" type="submit">Save move</button>
+          <button id="addChildBtn" class="button button-secondary" type="button" disabled>Add child move</button>
         </div>
       </form>
     </section>
-
-    <aside class="panel practice-panel">
-      <div class="panel-heading">
-        <h3>Quick Practice</h3>
-        <button id="randomBtn" class="tiny">Random</button>
-      </div>
-      <div id="practiceCard" class="practice-card empty">
-        <p>Click Random to summon a card from the tree.</p>
-      </div>
-      <div class="utility-box">
-        <h4>Import / Export</h4>
-        <button id="exportBtn" class="secondary full">Export JSON backup</button>
-        <button id="splitCompoundBtn" class="secondary full">Split compound moves</button>
-        <label class="file-label">
-          Import JSON
-          <input id="importInput" type="file" accept="application/json" />
-        </label>
-      </div>
-    </aside>
   </main>
 
-  <footer>
-    <p>Study law: one serious game, one opening note, one repair. Small moves, huge board. ♜</p>
+  <section class="page-shell study-shell">
+    <section class="panel trainer-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Training mode</p>
+          <h3>Board-first trainer</h3>
+          <p class="muted">See the position, name the move, and let preferred lines define the repertoire answer when branches exist.</p>
+        </div>
+
+        <div class="stack-actions">
+          <span id="trainerQueueCount" class="status-pill">0 training positions ready</span>
+          <button id="newPromptBtn" class="button button-primary button-tiny" type="button">New prompt</button>
+          <button id="selectedPromptBtn" class="button button-secondary button-tiny" type="button">Train selected</button>
+          <button id="revealPromptBtn" class="button button-ghost button-tiny" type="button">Reveal answer</button>
+        </div>
+      </div>
+
+      <div class="trainer-layout">
+        <div class="trainer-board-panel">
+          <div id="trainerTurnPill" class="mini-pill">White to move</div>
+          <div id="trainerBoard" class="chess-board compact" role="img" aria-label="Training chess board"></div>
+        </div>
+
+        <div class="trainer-info">
+          <div class="line-block">
+            <div class="line-label">Position</div>
+            <h4 id="trainerPositionTitle">Starting position</h4>
+            <div id="trainerPositionLine" class="line-strip"></div>
+          </div>
+
+          <div class="trainer-prompt-card">
+            <div class="prompt-copy">
+              <span class="prompt-label">What is the next move?</span>
+              <p id="trainerAcceptedMeta" class="muted">One repertoire move expected</p>
+            </div>
+
+            <form id="trainerForm" class="trainer-form">
+              <div class="trainer-answer-row">
+                <input id="trainerAnswerInput" placeholder="Bc4, Nf3, ...Bb6" autocomplete="off" />
+                <button id="trainerSubmitBtn" class="button button-primary" type="submit">Check</button>
+              </div>
+            </form>
+
+            <p id="trainerHint" class="trainer-hint"></p>
+            <div id="trainerFeedback"></div>
+            <div id="trainerReveal"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel repair-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Repair loop</p>
+          <h3>Losses become lessons</h3>
+          <p class="muted">Capture the mistake, the lesson, and the concrete repair so every painful game produces a clean fix.</p>
+        </div>
+
+        <div class="stack-actions">
+          <span id="repairQueueBadge" class="status-pill">0 open</span>
+          <label class="filter-field">
+            <span>Filter</span>
+            <select id="repairFilterInput">
+              <option value="all">All repairs</option>
+              <option value="needs_work">Needs work</option>
+              <option value="solved">Solved</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <form id="repairForm" class="repair-form">
+        <input id="repairIdInput" type="hidden" />
+        <input id="repairNodeIdInput" type="hidden" />
+        <input id="repairPathInput" type="hidden" />
+
+        <p id="repairEditorState" class="panel-note">Capture the mistake, the lesson, and the repair plan.</p>
+        <div id="repairLinkMeta" class="repair-link-banner">Not linked to a move yet.</div>
+
+        <label>
+          Mistake
+          <textarea id="repairMistakeInput" rows="3" placeholder="Allowed ...d5 break in the Italian." required></textarea>
+        </label>
+
+        <label>
+          Lesson
+          <textarea id="repairLessonInput" rows="3" placeholder="Need c3 before d4 so the center does not collapse." required></textarea>
+        </label>
+
+        <label>
+          Repair
+          <textarea id="repairActionInput" rows="3" placeholder="Review three model games and drill the move order tonight." required></textarea>
+        </label>
+
+        <label>
+          Status
+          <select id="repairStatusInput">
+            <option value="needs_work">Needs work</option>
+            <option value="solved">Solved</option>
+          </select>
+        </label>
+
+        <div class="form-actions">
+          <button class="button button-primary" type="submit">Save repair</button>
+          <button id="repairUseCurrentBtn" class="button button-secondary" type="button">Attach selected move</button>
+          <button id="repairResetBtn" class="button button-ghost" type="button">New blank repair</button>
+        </div>
+      </form>
+
+      <div id="repairList" class="repair-list"></div>
+    </section>
+  </section>
+
+  <footer class="page-shell page-footer">
+    <p>Study law: build the line, test it on the board, then repair the exact thing that failed.</p>
   </footer>
 
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-  <script type="module" src="./js/app.js?v=7"></script>
+  <script type="module" src="./js/app.js?v=11"></script>
   <script>
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js');
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
   </script>
 </body>
 </html>

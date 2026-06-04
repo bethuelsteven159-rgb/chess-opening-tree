@@ -1,37 +1,93 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Random Chess Card</title>
-  <meta name="theme-color" content="#111827" />
+  <title>GM Opening Tree - Random Cards</title>
+  <meta name="theme-color" content="#08111d" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="styles.css?v=5" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
+  </script>
+  <link rel="stylesheet" href="styles.css?v=11" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 </head>
 <body class="random-page">
+  <div class="texture-grid"></div>
   <div class="bg-orb orb-a"></div>
-  <main class="random-shell">
-    <a class="back-link" href="index.html">← Opening Tree</a>
-    <section class="random-card-wrap">
-      <p class="eyebrow">Random practice card</p>
-      <h1>Today’s opening spark</h1>
-      <div id="randomCard" class="practice-card big empty">
-        <p>Loading card...</p>
+  <div class="bg-orb orb-b"></div>
+
+  <header class="page-shell page-header">
+    <nav class="topbar">
+      <a class="brand brand-link" href="index.html">
+        <span class="logo">♟</span>
+        <div>
+          <h1>GM Opening Tree</h1>
+          <p>Pocket review deck</p>
+        </div>
+      </a>
+
+      <div class="nav-actions">
+        <button id="themeToggleBtn" class="button button-secondary button-tiny" type="button">Light mode</button>
+        <button id="logoutBtn" class="button button-secondary button-tiny" type="button">Logout</button>
       </div>
-      <div class="random-actions">
-        <button id="revealBtn" class="secondary">Reveal explanation</button>
-        <button id="anotherBtn" class="primary">Another card</button>
+    </nav>
+  </header>
+
+  <main class="page-shell random-shell">
+    <section class="panel random-lab">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Random review</p>
+          <h2 id="randomTitle">Pocket repertoire card</h2>
+          <p class="muted">Shuffle a trainer move, reveal the lesson, and review the board state without opening the full editor.</p>
+        </div>
+
+        <div class="stack-actions">
+          <span id="randomBoardMeta" class="status-pill">White to move</span>
+          <button id="anotherBtn" class="button button-primary button-tiny" type="button">Shuffle card</button>
+        </div>
       </div>
-      <p class="phone-note">Tip: add this page to your Android home screen for quick drill access.</p>
+
+      <div class="random-layout">
+        <div class="random-board-column">
+          <div class="board-frame compact-board-frame">
+            <div id="randomBoard" class="chess-board compact" role="img" aria-label="Random card board"></div>
+          </div>
+
+          <div class="line-block">
+            <div class="line-label">Line</div>
+            <div id="randomLine" class="line-strip">
+              <div class="line-empty">Loading line...</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="random-card-column">
+          <div id="randomCard" class="study-card empty">
+            <p>Loading card...</p>
+          </div>
+
+          <div class="random-actions">
+            <button id="revealBtn" class="button button-secondary" type="button">Reveal explanation</button>
+            <a class="button button-ghost" href="index.html">Back to dashboard</a>
+          </div>
+
+          <p id="randomStatus" class="phone-note">Tip: use this page for quick reviews when you only want one clean prompt at a time.</p>
+        </div>
+      </div>
     </section>
   </main>
 
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
-  <script type="module" src="./js/random.js?v=5"></script>
+  <script type="module" src="./js/random.js?v=11"></script>
   <script>
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js');
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
   </script>
 </body>
 </html>

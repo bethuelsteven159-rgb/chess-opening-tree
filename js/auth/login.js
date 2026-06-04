@@ -1,6 +1,14 @@
 import { supabase } from "../config/supabase.js";
+import { initPageChrome } from "../ui-shell.js";
 
 const googleLoginBtn = document.getElementById("googleLoginBtn");
+const loginStatusEl = document.getElementById("loginStatus");
+
+initPageChrome();
+
+function setStatus(message) {
+  if (loginStatusEl) loginStatusEl.textContent = message;
+}
 
 function getRedirectUrl() {
   const currentUrl = window.location.href.split("?")[0].split("#")[0];
@@ -12,8 +20,18 @@ function getRedirectUrl() {
   return `${window.location.origin}/chess-opening-tree/index.html`;
 }
 
-googleLoginBtn.addEventListener("click", async () => {
+async function redirectIfAlreadySignedIn() {
+  const { data, error } = await supabase.auth.getUser();
+  if (!error && data.user) {
+    window.location.href = "./index.html";
+  }
+}
+
+googleLoginBtn?.addEventListener("click", async () => {
   const redirectUrl = getRedirectUrl();
+
+  googleLoginBtn.disabled = true;
+  setStatus("Opening Google sign-in...");
 
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -23,6 +41,10 @@ googleLoginBtn.addEventListener("click", async () => {
   });
 
   if (error) {
-    alert("Login failed: " + error.message);
+    googleLoginBtn.disabled = false;
+    setStatus("Sign-in could not start.");
+    alert(`Login failed: ${error.message}`);
   }
 });
+
+redirectIfAlreadySignedIn();
