@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GM Opening Tree - Repair Loop</title>
+  <meta name="theme-color" content="#08111d" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
+  </script>
+  <link rel="stylesheet" href="styles.css?v=12" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+</head>
+<body class="app-page" data-page="repair">
+  <div class="texture-grid"></div>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+
+  <header class="page-shell page-header">
+    <nav class="topbar">
+      <a class="brand brand-link" href="index.html">
+        <span class="logo">&#9823;</span>
+        <div>
+          <h1>GM Opening Tree</h1>
+          <p>Repair loop</p>
+        </div>
+      </a>
+
+      <div class="page-nav" aria-label="Primary">
+        <a class="nav-link" href="index.html">Dashboard</a>
+        <a class="nav-link" href="editor.html">Move Editor</a>
+        <a class="nav-link" href="training.html">Training</a>
+        <a class="nav-link is-current" href="repair.html">Repair Loop</a>
+      </div>
+
+      <div class="nav-actions">
+        <button id="themeToggleBtn" class="button button-secondary button-tiny" type="button">Light mode</button>
+        <button id="syncBtn" class="button button-primary button-tiny" type="button">Sync</button>
+        <button id="logoutBtn" class="button button-secondary button-tiny" type="button">Logout</button>
+      </div>
+    </nav>
+
+    <section class="panel page-intro-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Repair loop</p>
+          <h2>Capture the mistake, name the lesson, and repair it until it stops hurting.</h2>
+          <p class="muted">
+            This page stays tied to a board position, so every lesson lives in the exact place where the game went wrong.
+          </p>
+        </div>
+
+        <div class="page-intro-meta">
+          <span id="repairQueueBadge" class="status-pill">0 open</span>
+        </div>
+      </div>
+    </section>
+  </header>
+
+  <main class="page-shell repair-shell">
+    <section class="panel repair-focus-panel">
+      <div class="section-heading">
+        <div>
+          <h3 id="repairFocusTitle">Repair focus board</h3>
+          <p id="repairFocusSubtitle" class="muted">Select a move in the editor or jump here from an existing repair item to anchor the lesson to a position.</p>
+        </div>
+
+        <div class="stack-actions">
+          <button id="repairUseCurrentBtn" class="button button-secondary button-tiny" type="button">Use selected move</button>
+          <a class="button button-ghost button-tiny" href="editor.html">Choose move in editor</a>
+        </div>
+      </div>
+
+      <div class="repair-focus-layout">
+        <div class="board-stage">
+          <div class="board-frame compact-board-frame">
+            <div id="repairBoard" class="chess-board compact" role="img" aria-label="Repair focus board"></div>
+          </div>
+        </div>
+
+        <div class="repair-focus-sidebar">
+          <div class="board-detail-grid">
+            <article class="board-detail-card">
+              <span class="board-detail-label">Linked move</span>
+              <strong id="repairFocusMove">Root view</strong>
+              <p id="repairFocusMoveCaption">Attach the selected move to tie the repair to a concrete spot in your tree.</p>
+            </article>
+
+            <article class="board-detail-card">
+              <span class="board-detail-label">Board status</span>
+              <strong id="repairBoardMeta">White to move</strong>
+              <p id="repairFocusStatus">Starting position.</p>
+            </article>
+          </div>
+
+          <article class="board-detail-card board-detail-wide">
+            <span class="board-detail-label">Lesson preview</span>
+            <strong id="repairFocusLessonTitle">Repair summary</strong>
+            <p id="repairFocusLesson">The active repair or selected move explanation will appear here.</p>
+          </article>
+
+          <div class="line-block">
+            <div class="line-label">Linked line</div>
+            <div id="repairFocusLine" class="line-strip">
+              <div class="line-empty">No linked move yet. Attach a selected move or jump from a repair item below.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="repair-workspace">
+      <section class="panel repair-panel">
+        <div class="section-heading">
+          <div>
+            <h3>Lesson editor</h3>
+            <p id="repairEditorState" class="muted">Capture the mistake, the lesson, and the repair plan.</p>
+          </div>
+
+          <label class="filter-field">
+            <span>Filter</span>
+            <select id="repairFilterInput">
+              <option value="all">All repairs</option>
+              <option value="needs_work">Needs work</option>
+              <option value="solved">Solved</option>
+            </select>
+          </label>
+        </div>
+
+        <form id="repairForm" class="repair-form">
+          <input id="repairIdInput" type="hidden" />
+          <input id="repairNodeIdInput" type="hidden" />
+          <input id="repairPathInput" type="hidden" />
+
+          <div id="repairLinkMeta" class="repair-link-banner">Not linked to a move yet.</div>
+
+          <label>
+            Mistake
+            <textarea id="repairMistakeInput" rows="3" placeholder="Allowed ...d5 break in the Italian." required></textarea>
+          </label>
+
+          <label>
+            Lesson
+            <textarea id="repairLessonInput" rows="3" placeholder="Need c3 before d4 so the center does not collapse." required></textarea>
+          </label>
+
+          <label>
+            Repair
+            <textarea id="repairActionInput" rows="3" placeholder="Review three model games and drill the move order tonight." required></textarea>
+          </label>
+
+          <label>
+            Status
+            <select id="repairStatusInput">
+              <option value="needs_work">Needs work</option>
+              <option value="solved">Solved</option>
+            </select>
+          </label>
+
+          <div class="form-actions">
+            <button class="button button-primary" type="submit">Save repair</button>
+            <button id="repairResetBtn" class="button button-ghost" type="button">New blank repair</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel repair-list-panel">
+        <div class="section-heading">
+          <div>
+            <h3>Repair queue</h3>
+            <p class="muted">Open items stay visible until you mark them solved for real.</p>
+          </div>
+          <span id="repairOpenCount" class="status-pill">0 open</span>
+        </div>
+
+        <div id="repairList" class="repair-list"></div>
+      </section>
+    </section>
+  </main>
+
+  <footer class="page-shell page-footer">
+    <p>Mistake, lesson, repair, repeat until the leak closes.</p>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/db.js"></script>
+  <script type="module" src="./js/app.js?v=12"></script>
+  <script>
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
+  </script>
+</body>
+</html>

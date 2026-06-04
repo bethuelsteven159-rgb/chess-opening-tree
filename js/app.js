@@ -14,9 +14,15 @@ import { bindImportButton, initPageChrome } from "./ui-shell.js";
 await requireOnlyMe();
 initPageChrome();
 
+if (!window.OpeningDB) {
+  throw new Error("OpeningDB is not available. Make sure js/db.js loads before js/app.js.");
+}
+
+const SELECTED_NODE_STORAGE_KEY = "gm_opening_tree_selected_node_v1";
+
 let nodes = [];
 let repairs = [];
-let selectedId = null;
+let selectedId = loadSelectedNodeId();
 let selectedRepairId = null;
 let trainerPrompt = null;
 let trainerResult = null;
@@ -24,47 +30,35 @@ let trainerRevealOpen = false;
 
 const $ = id => document.getElementById(id);
 
-const treeEl = $("tree");
-const moveForm = $("moveForm");
-const repairForm = $("repairForm");
-
-const liveBoardEl = $("liveBoard");
-const liveBoardTitleEl = $("liveBoardTitle");
-const liveBoardSubtitleEl = $("liveBoardSubtitle");
-const liveBoardMetaEl = $("liveBoardMeta");
-const liveMoveValueEl = $("liveMoveValue");
-const liveMoveCaptionEl = $("liveMoveCaption");
-const liveTurnValueEl = $("liveTurnValue");
-const liveStatusValueEl = $("liveStatusValue");
-const liveBoardLineEl = $("liveBoardLine");
-
-const trainerBoardEl = $("trainerBoard");
-const trainerPositionTitleEl = $("trainerPositionTitle");
-const trainerQueueCountEl = $("trainerQueueCount");
-const trainerTurnPillEl = $("trainerTurnPill");
-const trainerPositionLineEl = $("trainerPositionLine");
-const trainerAcceptedMetaEl = $("trainerAcceptedMeta");
-const trainerHintEl = $("trainerHint");
-const trainerFeedbackEl = $("trainerFeedback");
-const trainerRevealEl = $("trainerReveal");
-const trainerAnswerInput = $("trainerAnswerInput");
-const trainerSubmitBtn = $("trainerSubmitBtn");
-const revealPromptBtn = $("revealPromptBtn");
-const selectedPromptBtn = $("selectedPromptBtn");
-
-const repairListEl = $("repairList");
-const repairQueueBadgeEl = $("repairQueueBadge");
-const repairLinkMetaEl = $("repairLinkMeta");
-const repairEditorStateEl = $("repairEditorState");
-const repairFilterInput = $("repairFilterInput");
-
-const editorContextEl = $("editorContext");
-
 const highlightLabels = {
   blunder: "Blunder",
   great: "Great move",
   brilliant: "Brilliant"
 };
+
+function loadSelectedNodeId() {
+  return localStorage.getItem(SELECTED_NODE_STORAGE_KEY) || null;
+}
+
+function saveSelectedNodeId(id) {
+  if (id) localStorage.setItem(SELECTED_NODE_STORAGE_KEY, id);
+  else localStorage.removeItem(SELECTED_NODE_STORAGE_KEY);
+}
+
+function setSelectedNodeId(id) {
+  selectedId = id || null;
+  saveSelectedNodeId(selectedId);
+}
+
+function setText(id, value) {
+  const element = $(id);
+  if (element) element.textContent = value;
+}
+
+function setHtml(id, value) {
+  const element = $(id);
+  if (element) element.innerHTML = value;
+}
 
 function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>'"]/g, char => (
@@ -127,6 +121,56 @@ function pathFor(node) {
   return pathNodesFor(node).map(entry => entry.move).join("  ");
 }
 
+function openRepairsForNode(nodeId) {
+  return repairs.filter(repair => repair.related_node_id === nodeId && repair.status === "needs_work");
+}
+
+function isTrainingExcluded(node) {
+  return node?.exclude_from_training === true;
+}
+
+function isTrainingEnabled(node) {
+  return !isTrainingExcluded(node);
+}
+
+function rootTurnForMove(moveText) {
+  return /\.\.\./.test(String(moveText || "")) ? "b" : "w";
+}
+
+function trainingGroupKeyForNode(node) {
+  if (!node) return "__root_white__";
+  return node.parent_id || (rootTurnForMove(node.move) === "b" ? "__root_black__" : "__root_white__");
+}
+
+function describeMoveType(node) {
+  if (!node) {
+    return {
+      label: "Start position",
+      caption: "Select a move to inspect repertoire type, tags, and training status."
+    };
+  }
+
+  if (node.exclude_from_training) {
+    return {
+      label: "Excluded from training",
+      caption: node.tags?.length ? node.tags.slice(0, 3).join(" • ") : "This move stays in the tree but is skipped by training mode."
+    };
+  }
+
+  const secondary = [];
+
+  if (node.is_preferred) secondary.push("Preferred repertoire move");
+  if (node.highlight_kind) secondary.push(highlightLabel(node.highlight_kind));
+  if (node.tags?.length) secondary.push(node.tags.slice(0, 3).join(" • "));
+
+  return {
+    label: node.is_preferred
+      ? "Preferred repertoire move"
+      : (highlightLabel(node.highlight_kind || "") || "Standard tree move"),
+    caption: secondary.filter(Boolean).join(" • ") || (node.title || "This move is active in the study tree.")
+  };
+}
+
 function lineChipHtml(node, { clickable = false, activeId = selectedId } = {}) {
   const activeClass = node.id === activeId ? "active" : "";
   const body = `
@@ -148,18 +192,54 @@ function renderLineChips(path, options = {}) {
   return path.map(node => lineChipHtml(node, { clickable })).join("");
 }
 
+function selectNode(id, shouldPaint = true) {
+  setSelectedNodeId(id);
+  selectedRepairId = null;
+  populateEditor(nodeById(id));
+  if (shouldPaint) paint();
+}
+
 function renderStats() {
   const trainerPositions = buildTrainingPositions().length;
+  const eligibleCards = nodes.filter(isTrainingEnabled).length;
   const openRepairs = repairs.filter(repair => repair.status === "needs_work").length;
+  const rootLines = nodes.filter(node => !node.parent_id).length;
 
-  $("nodeCount").textContent = nodes.length;
-  $("lineCount").textContent = nodes.filter(node => !node.parent_id).length;
-  $("trainerCount").textContent = trainerPositions;
-  $("preferredCount").textContent = nodes.filter(node => node.is_preferred).length;
-  $("repairCount").textContent = openRepairs;
+  setText("nodeCount", String(nodes.length));
+  setText("lineCount", String(rootLines));
+  setText("trainerCount", String(trainerPositions));
+  setText("repairCount", String(openRepairs));
+
+  setText("dashboardRandomCount", `${eligibleCards} ready`);
+  setText("dashboardEditorCount", `${nodes.length} moves`);
+  setText("dashboardTrainerCount", `${trainerPositions} prompts`);
+  setText("dashboardRepairCount", `${openRepairs} open`);
+  setText("repairOpenCount", `${openRepairs} open`);
+}
+
+function renderDashboardFocus() {
+  const titleEl = $("dashboardFocusTitle");
+  if (!titleEl) return;
+
+  const node = currentNode();
+  const path = node ? pathNodesFor(node) : [];
+
+  if (!node) {
+    titleEl.textContent = "No move selected yet";
+    setText("dashboardFocusSubtitle", "Open the move editor, pick a line, and the selected focus will travel with you across pages.");
+    setHtml("dashboardCurrentLine", `<div class="line-empty">Selection is empty. The workspace is ready whenever you want to anchor it to a line.</div>`);
+    return;
+  }
+
+  titleEl.textContent = node.title || `Focused on ${node.move}`;
+  setText("dashboardFocusSubtitle", `Current selection: ${node.move}. Training and repair pages can use this focus immediately.`);
+  setHtml("dashboardCurrentLine", renderLineChips(path, {
+    emptyText: "Selection is empty."
+  }));
 }
 
 function renderLiveBoard() {
+  const liveBoardEl = $("liveBoard");
   if (!liveBoardEl) return;
 
   const current = currentNode();
@@ -172,6 +252,7 @@ function renderLiveBoard() {
   const moveValue = current ? current.move : "Root view";
   const titleValue = current ? `Position after ${current.move}` : "Root position";
   const turnValue = boardReady ? colorToMoveText(game.turn()) : "Board waiting for chess.js";
+  const moveType = describeMoveType(current);
 
   let subtitleValue = "The live board follows the move you select in Line Explorer.";
   if (!boardReady) {
@@ -201,18 +282,23 @@ function renderLiveBoard() {
     }
   }
 
-  liveBoardTitleEl.textContent = titleValue;
-  liveBoardSubtitleEl.textContent = subtitleValue;
-  liveBoardMetaEl.textContent = boardReady && historyLength ? `${turnValue} / ${historyLength} ply` : turnValue;
-  liveMoveValueEl.textContent = moveValue;
-  liveMoveCaptionEl.textContent = current
-    ? (current.title || pathFor(current))
-    : "Choose a move in the explorer to jump the position here.";
-  liveTurnValueEl.textContent = turnValue;
-  liveStatusValueEl.textContent = statusValue;
-  liveBoardLineEl.innerHTML = renderLineChips(path, {
+  setText("liveBoardTitle", titleValue);
+  setText("liveBoardSubtitle", subtitleValue);
+  setText("liveBoardMeta", boardReady && historyLength ? `${turnValue} / ${historyLength} ply` : turnValue);
+  setText("liveMoveValue", moveValue);
+  setText("liveMoveCaption", current ? (current.title || pathFor(current)) : "Choose a move in the explorer to jump the position here.");
+  setText("liveMoveTypeValue", moveType.label);
+  setText("liveMoveTypeCaption", moveType.caption);
+  setText("liveTurnValue", turnValue);
+  setText("liveStatusValue", statusValue);
+  setText("liveExplanationTitle", current?.title || "Study note");
+  setText(
+    "liveExplanationText",
+    current?.explanation || current?.title || "Select a move to surface its plans, tactical ideas, and move-order explanation."
+  );
+  setHtml("liveBoardLine", renderLineChips(path, {
     emptyText: "No move selected yet. The board is ready at the start position."
-  });
+  }));
   liveBoardEl.innerHTML = renderBoardSquares(rows, attempt?.lastMove || null);
 }
 
@@ -270,39 +356,45 @@ function renderChoices() {
 }
 
 function populateEditor(node, { newRoot = false } = {}) {
-  $("editorTitle").textContent = node ? `Editing ${node.move}` : (newRoot ? "New root move" : "Select a move");
-  $("deleteBtn").disabled = !node;
-  $("addChildBtn").disabled = !node;
-  $("moveInput").value = node?.move || "";
+  const moveInput = $("moveInput");
+  if (!moveInput) return;
+
+  setText("editorTitle", node ? `Editing ${node.move}` : (newRoot ? "New root move" : "Select a move"));
+
+  const deleteBtn = $("deleteBtn");
+  const addChildBtn = $("addChildBtn");
+
+  if (deleteBtn) deleteBtn.disabled = !node;
+  if (addChildBtn) addChildBtn.disabled = !node;
+
+  moveInput.value = node?.move || "";
   $("titleInput").value = node?.title || "";
   $("highlightInput").value = node?.highlight_kind || "";
   $("explanationInput").value = node?.explanation || "";
   $("tagsInput").value = (node?.tags || []).join(", ");
-  $("practiceInput").checked = node?.is_practice_card !== false;
+  $("excludeTrainingInput").checked = node?.exclude_from_training === true;
   $("preferredInput").checked = node?.is_preferred === true;
 
-  const nodeRepairs = node
-    ? repairs.filter(repair => repair.related_node_id === node.id && repair.status === "needs_work").length
-    : 0;
+  const nodeRepairs = node ? openRepairsForNode(node.id).length : 0;
 
-  editorContextEl.textContent = node
-    ? `${nodeRepairs} open repair item${nodeRepairs === 1 ? "" : "s"} linked here. Mark a move as preferred when this is the repertoire answer the trainer should expect.`
-    : "Create a root move or select an existing move to edit its title, tags, preferred status, and trainer settings.";
-}
-
-function selectNode(id, shouldPaint = true) {
-  selectedId = id;
-  populateEditor(nodeById(id));
-  if (shouldPaint) paint();
+  setText(
+    "editorContext",
+    node
+      ? `${nodeRepairs} open repair item${nodeRepairs === 1 ? "" : "s"} linked here. Preferred moves define accepted trainer answers, while do-not-train keeps side lines out of prompts.`
+      : "Create a root move or select an existing move to edit its title, tags, preferred status, and trainer settings."
+  );
 }
 
 function resetEditorForNewRoot() {
-  selectedId = null;
+  setSelectedNodeId(null);
+  selectedRepairId = null;
   populateEditor(null, { newRoot: true });
   paint();
 }
 
 function getFormNode(parentId = null, existingId = null) {
+  const excludeFromTraining = $("excludeTrainingInput").checked;
+
   return {
     id: existingId || crypto.randomUUID(),
     parent_id: parentId,
@@ -311,7 +403,8 @@ function getFormNode(parentId = null, existingId = null) {
     highlight_kind: $("highlightInput").value,
     explanation: $("explanationInput").value.trim(),
     tags: $("tagsInput").value.split(",").map(tag => tag.trim()).filter(Boolean),
-    is_practice_card: $("practiceInput").checked,
+    exclude_from_training: excludeFromTraining,
+    is_practice_card: !excludeFromTraining,
     is_preferred: $("preferredInput").checked,
     created_at: nodes.find(node => node.id === existingId)?.created_at || new Date().toISOString()
   };
@@ -341,7 +434,8 @@ function migrateSplitCompoundMoves(sourceNodes) {
       explanation: isLastPart ? original.explanation || "" : "",
       highlight_kind: isLastPart ? original.highlight_kind || "" : "",
       tags: isLastPart ? [...(original.tags || [])] : [],
-      is_practice_card: isLastPart ? original.is_practice_card !== false : true,
+      exclude_from_training: isLastPart ? original.exclude_from_training === true : false,
+      is_practice_card: isLastPart ? original.exclude_from_training !== true : true,
       is_preferred: isLastPart ? original.is_preferred === true : false,
       created_at: addMilliseconds(original.created_at, partIndex)
     };
@@ -390,7 +484,7 @@ async function splitCompoundMovesOnce() {
   }
 
   await OpeningDB.saveAllNodes(migrated);
-  selectedId = null;
+  setSelectedNodeId(null);
   await refresh();
 
   alert(`Done. Split ${splitNodeCount} move cell(s) and created ${addedNodeCount} extra child node(s).`);
@@ -399,28 +493,34 @@ async function splitCompoundMovesOnce() {
 function buildTrainingPositions() {
   const grouped = new Map();
 
-  for (const node of nodes.filter(entry => entry.is_practice_card !== false)) {
-    const key = node.parent_id || "__root__";
+  for (const node of nodes.filter(isTrainingEnabled)) {
+    const key = trainingGroupKeyForNode(node);
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key).push(node);
   }
 
-  return [...grouped.values()].map(group => {
+  return [...grouped.entries()].map(([groupKey, group]) => {
     const parentId = group[0]?.parent_id || null;
     const acceptedNodes = group.some(node => node.is_preferred)
       ? group.filter(node => node.is_preferred)
       : group;
     const positionNode = parentId ? nodeById(parentId) : null;
     const positionNodes = positionNode ? pathNodesFor(positionNode) : [];
-    const allChildren = children(parentId);
+    const startingTurn = parentId ? "w" : rootTurnForMove(group[0]?.move || "");
+    const allChildren = parentId
+      ? children(parentId)
+      : nodes.filter(node => !node.parent_id && rootTurnForMove(node.move) === startingTurn);
     const pendingRepairs = repairs.filter(repair =>
       repair.status === "needs_work" &&
       acceptedNodes.some(node => node.id === repair.related_node_id)
     );
 
     return {
+      groupKey,
       parentId,
+      startingTurn,
       acceptedNodes,
+      eligibleChildren: group,
       allChildren,
       positionNodes,
       pendingRepairs
@@ -428,16 +528,19 @@ function buildTrainingPositions() {
   });
 }
 
-function findTrainingPosition(parentId, groups = buildTrainingPositions()) {
-  return groups.find(group => group.parentId === parentId) || null;
+function findTrainingPosition(groupKey, groups = buildTrainingPositions()) {
+  return groups.find(group => group.groupKey === groupKey) || null;
 }
 
-function focusParentIdFromSelection(groups = buildTrainingPositions()) {
+function focusTrainingGroupKeyFromSelection(groups = buildTrainingPositions()) {
   const current = currentNode();
   if (!current) return undefined;
 
   if (findTrainingPosition(current.id, groups)) return current.id;
-  if (findTrainingPosition(current.parent_id || null, groups)) return current.parent_id || null;
+
+  const currentGroupKey = trainingGroupKeyForNode(current);
+  if (findTrainingPosition(currentGroupKey, groups)) return currentGroupKey;
+
   return undefined;
 }
 
@@ -466,7 +569,8 @@ function setTrainerPrompt(group) {
   trainerPrompt = group;
   trainerResult = null;
   trainerRevealOpen = false;
-  if (trainerAnswerInput) trainerAnswerInput.value = "";
+  const input = $("trainerAnswerInput");
+  if (input) input.value = "";
 }
 
 function queueTrainerPrompt({ focusSelection = false } = {}) {
@@ -479,9 +583,9 @@ function queueTrainerPrompt({ focusSelection = false } = {}) {
 
   let pool = groups;
   if (focusSelection) {
-    const focusParentId = focusParentIdFromSelection(groups);
-    if (focusParentId !== undefined && findTrainingPosition(focusParentId, groups)) {
-      pool = groups.filter(group => group.parentId === focusParentId);
+    const focusGroupKey = focusTrainingGroupKeyFromSelection(groups);
+    if (focusGroupKey !== undefined && findTrainingPosition(focusGroupKey, groups)) {
+      pool = groups.filter(group => group.groupKey === focusGroupKey);
     }
   }
 
@@ -504,7 +608,7 @@ function synchronizeTrainerPrompt() {
     return;
   }
 
-  trainerPrompt = findTrainingPosition(trainerPrompt.parentId, groups) || pickWeightedPrompt(groups);
+  trainerPrompt = findTrainingPosition(trainerPrompt.groupKey, groups) || pickWeightedPrompt(groups);
 }
 
 function trainerAcceptedMovesText(prompt) {
@@ -534,6 +638,13 @@ function renderTrainerFeedback(prompt) {
       ? ` ${escapeHtml(trainerResult.node.move)} is one of your accepted repertoire choices here.`
       : "";
     return `<div class="feedback-box feedback-correct">&#10003; Correct.${extra}</div>`;
+  }
+
+  if (trainerResult.kind === "excluded-branch") {
+    return `
+      <div class="feedback-box feedback-incorrect">
+        &#10007; ${escapeHtml(trainerResult.node.move)} exists in your tree, but it is marked <strong>do not use for training</strong>. The prompt expected <strong>${escapeHtml(acceptedMoves)}</strong>.
+      </div>`;
   }
 
   if (trainerResult.kind === "tree-branch") {
@@ -594,52 +705,79 @@ function renderTrainerReveal(prompt) {
 }
 
 function paintTrainer() {
+  const trainerBoardEl = $("trainerBoard");
   if (!trainerBoardEl) return;
 
   const groups = buildTrainingPositions();
-  const focusPromptAvailable = findTrainingPosition(focusParentIdFromSelection(groups), groups);
+  const focusPromptAvailable = findTrainingPosition(focusTrainingGroupKeyFromSelection(groups), groups);
+  const selectedPromptBtn = $("selectedPromptBtn");
+  const revealPromptBtn = $("revealPromptBtn");
+  const trainerSubmitBtn = $("trainerSubmitBtn");
+  const trainerAnswerInput = $("trainerAnswerInput");
 
-  selectedPromptBtn.disabled = !focusPromptAvailable;
-  revealPromptBtn.disabled = !trainerPrompt;
-  trainerSubmitBtn.disabled = !trainerPrompt;
-  trainerAnswerInput.disabled = !trainerPrompt;
-  trainerQueueCountEl.textContent = `${groups.length} training position${groups.length === 1 ? "" : "s"} ready`;
+  if (selectedPromptBtn) selectedPromptBtn.disabled = !focusPromptAvailable;
+  if (revealPromptBtn) revealPromptBtn.disabled = !trainerPrompt;
+  if (trainerSubmitBtn) trainerSubmitBtn.disabled = !trainerPrompt;
+  if (trainerAnswerInput) trainerAnswerInput.disabled = !trainerPrompt;
+
+  setText("trainerQueueCount", `${groups.length} training position${groups.length === 1 ? "" : "s"} ready`);
+
+  const current = currentNode();
+  if ($("trainerSelectionStatus")) {
+    if (!current) {
+      setText("trainerSelectionStatus", "Prompts can come from anywhere in the tree, or focus on the line you selected in the move editor.");
+    } else if (focusPromptAvailable) {
+      setText("trainerSelectionStatus", `Selected focus: ${pathFor(current)}. Use "Train selected" to stay inside this branch.`);
+    } else {
+      setText("trainerSelectionStatus", `Selected focus: ${pathFor(current)}. This exact node is not a training prompt yet, so random prompts will use the full queue.`);
+    }
+  }
 
   if (!groups.length) {
-    trainerPositionTitleEl.textContent = "Trainer waiting";
-    trainerTurnPillEl.textContent = "No prompts";
-    trainerPositionLineEl.innerHTML = `<div class="line-empty">Mark moves for training or create a preferred line to start drilling.</div>`;
-    trainerAcceptedMetaEl.textContent = "Add trainer moves in the editor";
-    trainerHintEl.textContent = "Open repairs linked to moves will be surfaced here once they exist.";
-    trainerFeedbackEl.innerHTML = renderTrainerFeedback(null);
-    trainerRevealEl.innerHTML = "";
+    setText("trainerPositionTitle", "Trainer waiting");
+    setText("trainerTurnPill", "No prompts");
+    setHtml("trainerPositionLine", `<div class="line-empty">Create moves and leave them available for training to start drilling.</div>`);
+    setText("trainerAcceptedMeta", "Add trainer moves in the editor");
+    setText("trainerHint", 'Moves marked "Do not use for training" are skipped here.');
+    setHtml("trainerFeedback", renderTrainerFeedback(null));
+    setHtml("trainerReveal", "");
     trainerBoardEl.innerHTML = renderBoardSquares(boardFromFen(), null);
+    if (revealPromptBtn) revealPromptBtn.textContent = "Reveal answer";
     return;
   }
 
   synchronizeTrainerPrompt();
 
   const prompt = trainerPrompt;
-  const attempt = bestBoardAttempt(prompt.positionNodes);
-  const game = attempt?.game || createChessGame("w");
+  const attempt = prompt.positionNodes.length ? bestBoardAttempt(prompt.positionNodes) : null;
+  const game = attempt?.game || createChessGame(prompt.startingTurn || "w");
   const boardReady = Boolean(game);
   const rows = game ? boardRowsFromGame(game) : boardFromFen();
 
-  trainerPositionTitleEl.textContent = trainerAnswerTitle(prompt);
-  trainerTurnPillEl.textContent = boardReady ? colorToMoveText(game.turn()) : "Board waiting for chess.js";
-  trainerPositionLineEl.innerHTML = renderLineChips(prompt.positionNodes, {
+  setText("trainerPositionTitle", trainerAnswerTitle(prompt));
+  setText("trainerTurnPill", boardReady ? colorToMoveText(game.turn()) : "Board waiting for chess.js");
+  setHtml("trainerPositionLine", renderLineChips(prompt.positionNodes, {
     emptyText: "The prompt starts from the initial position."
-  });
-  trainerAcceptedMetaEl.textContent = prompt.acceptedNodes.length === 1
-    ? "One repertoire move expected"
-    : `${prompt.acceptedNodes.length} repertoire moves accepted`;
-  trainerHintEl.textContent = prompt.pendingRepairs.length
-    ? `Repair cue: ${prompt.pendingRepairs[0].lesson || prompt.pendingRepairs[0].mistake || prompt.pendingRepairs[0].repair}`
-    : "No open repair is linked to this prompt yet.";
-  trainerFeedbackEl.innerHTML = renderTrainerFeedback(prompt);
-  trainerRevealEl.innerHTML = renderTrainerReveal(prompt);
+  }));
+  setText(
+    "trainerAcceptedMeta",
+    prompt.acceptedNodes.length === 1
+      ? "One repertoire move expected"
+      : `${prompt.acceptedNodes.length} repertoire moves accepted`
+  );
+  setText(
+    "trainerHint",
+    prompt.pendingRepairs.length
+      ? `Repair cue: ${prompt.pendingRepairs[0].lesson || prompt.pendingRepairs[0].mistake || prompt.pendingRepairs[0].repair}`
+      : "Preferred moves are accepted answers when the position branches."
+  );
+  setHtml("trainerFeedback", renderTrainerFeedback(prompt));
+  setHtml("trainerReveal", renderTrainerReveal(prompt));
   trainerBoardEl.innerHTML = renderBoardSquares(rows, attempt?.lastMove || null);
-  revealPromptBtn.textContent = trainerRevealOpen ? "Hide answer" : "Reveal answer";
+
+  if (revealPromptBtn) {
+    revealPromptBtn.textContent = trainerRevealOpen ? "Hide answer" : "Reveal answer";
+  }
 }
 
 function repairLinkedSummary(repair) {
@@ -655,18 +793,25 @@ function setRepairLink(nodeId, fallbackPath = "") {
   const node = nodeId ? nodeById(nodeId) : null;
   const resolvedPath = node ? pathFor(node) : fallbackPath;
 
-  $("repairNodeIdInput").value = node?.id || "";
-  $("repairPathInput").value = resolvedPath;
-  repairLinkMetaEl.textContent = node
-    ? `Linked to ${resolvedPath}`
-    : (resolvedPath ? `Pinned to ${resolvedPath}` : "Not linked to a move yet.");
+  if ($("repairNodeIdInput")) $("repairNodeIdInput").value = node?.id || "";
+  if ($("repairPathInput")) $("repairPathInput").value = resolvedPath;
+
+  setText(
+    "repairLinkMeta",
+    node
+      ? `Linked to ${resolvedPath}`
+      : (resolvedPath ? `Pinned to ${resolvedPath}` : "Not linked to a move yet.")
+  );
 }
 
 function resetRepairForm({ keepSelectionLink = true } = {}) {
+  const repairForm = $("repairForm");
+  if (!repairForm) return;
+
   selectedRepairId = null;
   repairForm.reset();
   $("repairStatusInput").value = "needs_work";
-  repairEditorStateEl.textContent = "Capture the mistake, the lesson, and the repair plan.";
+  setText("repairEditorState", "Capture the mistake, the lesson, and the repair plan.");
 
   if (keepSelectionLink && currentNode()) {
     setRepairLink(currentNode().id, pathFor(currentNode()));
@@ -676,14 +821,21 @@ function resetRepairForm({ keepSelectionLink = true } = {}) {
 }
 
 function fillRepairForm(repair) {
+  if (!$("repairForm")) return;
+
   selectedRepairId = repair.id;
   $("repairIdInput").value = repair.id;
   $("repairMistakeInput").value = repair.mistake || "";
   $("repairLessonInput").value = repair.lesson || "";
   $("repairActionInput").value = repair.repair || "";
   $("repairStatusInput").value = repair.status || "needs_work";
+
+  if (repair.related_node_id) {
+    setSelectedNodeId(repair.related_node_id);
+  }
+
   setRepairLink(repair.related_node_id, repair.position_path || "");
-  repairEditorStateEl.textContent = "Editing an existing repair loop.";
+  setText("repairEditorState", "Editing an existing repair loop.");
 }
 
 function repairStatusHtml(status) {
@@ -692,10 +844,77 @@ function repairStatusHtml(status) {
   return `<span class="repair-status ${className}">${label}</span>`;
 }
 
+function repairFocusNode() {
+  const activeRepair = selectedRepairId ? repairById(selectedRepairId) : null;
+  if (activeRepair?.related_node_id) return nodeById(activeRepair.related_node_id);
+  return currentNode();
+}
+
+function renderRepairFocus() {
+  const repairBoardEl = $("repairBoard");
+  if (!repairBoardEl) return;
+
+  const activeRepair = selectedRepairId ? repairById(selectedRepairId) : null;
+  const node = repairFocusNode();
+  const path = node ? pathNodesFor(node) : [];
+  const fallbackPath = activeRepair?.position_path || "";
+  const attempt = bestBoardAttempt(path);
+  const game = attempt?.game || createChessGame("w");
+  const boardReady = Boolean(game);
+  const rows = game ? boardRowsFromGame(game) : boardFromFen();
+  const historyLength = attempt?.history.length || 0;
+  const turnValue = boardReady ? colorToMoveText(game.turn()) : "Board waiting for chess.js";
+
+  let subtitle = "Select a move in the editor or jump here from an existing repair item to anchor the lesson to a position.";
+  if (activeRepair) {
+    subtitle = activeRepair.mistake || activeRepair.lesson || activeRepair.repair || subtitle;
+  } else if (node?.title) {
+    subtitle = node.title;
+  }
+
+  let statusValue = "Starting position.";
+  if (!boardReady) {
+    statusValue = "Showing the starting board until chess.js becomes available.";
+  } else if (attempt?.failedMove) {
+    statusValue = `Stopped before ${attempt.failedMove}.`;
+  } else if (historyLength) {
+    statusValue = `Line depth: ${historyLength} half-move${historyLength === 1 ? "" : "s"}.`;
+  }
+
+  setText("repairFocusTitle", node ? `Repair focus after ${node.move}` : (fallbackPath ? `Repair focus for ${fallbackPath}` : "Repair focus board"));
+  setText("repairFocusSubtitle", subtitle);
+  setText("repairFocusMove", node?.move || (fallbackPath ? "Pinned note" : "Root view"));
+  setText(
+    "repairFocusMoveCaption",
+    node
+      ? (node.title || pathFor(node))
+      : (fallbackPath || "Attach the selected move to tie the repair to a concrete spot in your tree.")
+  );
+  setText("repairBoardMeta", turnValue);
+  setText("repairFocusStatus", statusValue);
+  setText("repairFocusLessonTitle", activeRepair ? "Active repair" : "Selected move note");
+  setText(
+    "repairFocusLesson",
+    activeRepair
+      ? `${activeRepair.lesson || activeRepair.mistake || activeRepair.repair || "No repair text yet."}`
+      : (node?.explanation || node?.title || "The active repair or selected move explanation will appear here.")
+  );
+  setHtml(
+    "repairFocusLine",
+    path.length
+      ? renderLineChips(path, {
+          emptyText: "No linked move yet. Attach a selected move or jump from a repair item below."
+        })
+      : `<div class="line-empty">${escapeHtml(fallbackPath || "No linked move yet. Attach a selected move or jump from a repair item below.")}</div>`
+  );
+  repairBoardEl.innerHTML = renderBoardSquares(rows, attempt?.lastMove || null);
+}
+
 function renderRepairList() {
+  const repairListEl = $("repairList");
   if (!repairListEl) return;
 
-  const filterValue = repairFilterInput.value;
+  const filterValue = $("repairFilterInput")?.value || "all";
   const filtered = repairs
     .filter(repair => filterValue === "all" || repair.status === filterValue)
     .sort((a, b) => {
@@ -703,7 +922,9 @@ function renderRepairList() {
       return Date.parse(b.created_at || "") - Date.parse(a.created_at || "");
     });
 
-  repairQueueBadgeEl.textContent = `${repairs.filter(repair => repair.status === "needs_work").length} open`;
+  const openCount = repairs.filter(repair => repair.status === "needs_work").length;
+  setText("repairQueueBadge", `${openCount} open`);
+  setText("repairOpenCount", `${openCount} open`);
 
   if (!filtered.length) {
     repairListEl.innerHTML = `<div class="empty-state">No repair notes in this filter yet. Link one to the current move and start capturing the lesson loop.</div>`;
@@ -730,15 +951,20 @@ function renderRepairList() {
 }
 
 function paint() {
-  treeEl.innerHTML = renderChoices();
+  if ($("tree")) {
+    $("tree").innerHTML = renderChoices();
+  }
+
   renderStats();
+  renderDashboardFocus();
   renderLiveBoard();
   paintTrainer();
+  renderRepairFocus();
   renderRepairList();
 
   if (!selectedRepairId) {
     if (currentNode()) setRepairLink(currentNode().id, pathFor(currentNode()));
-    else if (!$("repairIdInput").value) setRepairLink(null, "");
+    else if ($("repairIdInput") && !$("repairIdInput").value) setRepairLink(null, "");
   }
 }
 
@@ -746,23 +972,35 @@ async function refresh() {
   nodes = await OpeningDB.loadNodes();
   repairs = await OpeningDB.loadRepairItems();
 
-  if (selectedId && !nodeById(selectedId)) selectedId = null;
-  if (selectedRepairId && !repairById(selectedRepairId)) selectedRepairId = null;
+  if (selectedId && !nodeById(selectedId)) {
+    setSelectedNodeId(null);
+  }
+
+  if (selectedRepairId && !repairById(selectedRepairId)) {
+    selectedRepairId = null;
+  }
 
   synchronizeTrainerPrompt();
 
-  if (selectedId) populateEditor(nodeById(selectedId));
-  else if (!$("moveInput").value) populateEditor(null);
+  if ($("moveInput")) {
+    if (selectedId) populateEditor(nodeById(selectedId));
+    else populateEditor(null);
+  }
 
-  if (selectedRepairId) fillRepairForm(repairById(selectedRepairId));
-  else if (!$("repairIdInput").value) resetRepairForm({ keepSelectionLink: Boolean(currentNode()) });
+  if ($("repairForm")) {
+    if (selectedRepairId && repairById(selectedRepairId)) {
+      fillRepairForm(repairById(selectedRepairId));
+    } else if (!$("repairIdInput").value) {
+      resetRepairForm({ keepSelectionLink: Boolean(currentNode()) });
+    }
+  }
 
   paint();
 }
 
 function backupPayload() {
   return {
-    version: 3,
+    version: 4,
     exported_at: new Date().toISOString(),
     nodes,
     repairs
@@ -799,222 +1037,281 @@ function parseImportedBackup(text) {
   };
 }
 
-moveForm.addEventListener("submit", async event => {
-  event.preventDefault();
+const moveForm = $("moveForm");
+if (moveForm) {
+  moveForm.addEventListener("submit", async event => {
+    event.preventDefault();
 
-  const existing = nodeById(selectedId);
-  const node = getFormNode(existing?.parent_id || null, selectedId || null);
-  await OpeningDB.upsertNode(node);
-  selectedId = node.id;
+    const existing = nodeById(selectedId);
+    const node = getFormNode(existing?.parent_id || null, selectedId || null);
+    await OpeningDB.upsertNode(node);
+    setSelectedNodeId(node.id);
 
-  await refresh();
-});
-
-repairForm.addEventListener("submit", async event => {
-  event.preventDefault();
-
-  const repair = {
-    id: $("repairIdInput").value || crypto.randomUUID(),
-    related_node_id: $("repairNodeIdInput").value || null,
-    position_path: $("repairPathInput").value.trim(),
-    mistake: $("repairMistakeInput").value.trim(),
-    lesson: $("repairLessonInput").value.trim(),
-    repair: $("repairActionInput").value.trim(),
-    status: $("repairStatusInput").value,
-    created_at: repairById($("repairIdInput").value)?.created_at || new Date().toISOString()
-  };
-
-  await OpeningDB.upsertRepairItem(repair);
-  selectedRepairId = repair.id;
-
-  await refresh();
-});
-
-$("trainerForm").addEventListener("submit", event => {
-  event.preventDefault();
-
-  if (!trainerPrompt) return;
-
-  const answer = trainerAnswerInput.value.trim();
-  if (!answer) return;
-
-  const acceptedNode = trainerPrompt.acceptedNodes.find(node => moveTextMatches(answer, node.move));
-
-  if (acceptedNode) {
-    trainerResult = { kind: "correct", node: acceptedNode };
-  } else {
-    const siblingNode = trainerPrompt.allChildren.find(node => moveTextMatches(answer, node.move));
-    trainerResult = siblingNode
-      ? { kind: "tree-branch", node: siblingNode }
-      : { kind: "incorrect" };
-  }
-
-  trainerRevealOpen = true;
-  paintTrainer();
-});
-
-treeEl.addEventListener("click", event => {
-  const chip = event.target.closest(".line-chip");
-  if (chip?.dataset.id) {
-    selectNode(chip.dataset.id);
-    return;
-  }
-
-  const choice = event.target.closest(".choice-card");
-  if (choice?.dataset.id) {
-    selectNode(choice.dataset.id);
-    return;
-  }
-
-  if (event.target.closest("#backLineBtn")) {
-    const current = currentNode();
-    selectedId = current?.parent_id || null;
-    if (selectedId) populateEditor(nodeById(selectedId));
-    else populateEditor(null);
-    paint();
-    return;
-  }
-
-  if (event.target.closest("#rootLineBtn")) {
-    selectedId = null;
-    populateEditor(null);
-    paint();
-  }
-});
-
-repairListEl.addEventListener("click", async event => {
-  const actionButton = event.target.closest("[data-action]");
-  const actionRow = event.target.closest("[data-id]");
-  if (!actionButton || !actionRow) return;
-
-  const repair = repairById(actionRow.dataset.id);
-  if (!repair) return;
-
-  const action = actionButton.dataset.action;
-
-  if (action === "edit") {
-    fillRepairForm(repair);
-    paint();
-    return;
-  }
-
-  if (action === "jump") {
-    if (repair.related_node_id) selectNode(repair.related_node_id);
-    return;
-  }
-
-  if (action === "toggle") {
-    await OpeningDB.upsertRepairItem({
-      ...repair,
-      status: repair.status === "solved" ? "needs_work" : "solved"
-    });
     await refresh();
-    return;
-  }
+  });
+}
 
-  if (action === "delete" && confirm("Delete this repair loop?")) {
-    if (selectedRepairId === repair.id) {
-      selectedRepairId = null;
-      resetRepairForm({ keepSelectionLink: true });
+const repairForm = $("repairForm");
+if (repairForm) {
+  repairForm.addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const repair = {
+      id: $("repairIdInput").value || crypto.randomUUID(),
+      related_node_id: $("repairNodeIdInput").value || null,
+      position_path: $("repairPathInput").value.trim(),
+      mistake: $("repairMistakeInput").value.trim(),
+      lesson: $("repairLessonInput").value.trim(),
+      repair: $("repairActionInput").value.trim(),
+      status: $("repairStatusInput").value,
+      created_at: repairById($("repairIdInput").value)?.created_at || new Date().toISOString()
+    };
+
+    await OpeningDB.upsertRepairItem(repair);
+    selectedRepairId = repair.id;
+
+    await refresh();
+  });
+}
+
+const trainerForm = $("trainerForm");
+if (trainerForm) {
+  trainerForm.addEventListener("submit", event => {
+    event.preventDefault();
+
+    if (!trainerPrompt) return;
+
+    const answer = $("trainerAnswerInput").value.trim();
+    if (!answer) return;
+
+    const acceptedNode = trainerPrompt.acceptedNodes.find(node => moveTextMatches(answer, node.move));
+
+    if (acceptedNode) {
+      trainerResult = { kind: "correct", node: acceptedNode };
+    } else {
+      const siblingNode = trainerPrompt.allChildren.find(node => moveTextMatches(answer, node.move));
+      if (siblingNode?.exclude_from_training) {
+        trainerResult = { kind: "excluded-branch", node: siblingNode };
+      } else if (siblingNode) {
+        trainerResult = { kind: "tree-branch", node: siblingNode };
+      } else {
+        trainerResult = { kind: "incorrect" };
+      }
     }
-    await OpeningDB.deleteRepairItem(repair.id);
+
+    trainerRevealOpen = true;
+    paintTrainer();
+  });
+}
+
+const treeEl = $("tree");
+if (treeEl) {
+  treeEl.addEventListener("click", event => {
+    const chip = event.target.closest(".line-chip");
+    if (chip?.dataset.id) {
+      selectNode(chip.dataset.id);
+      return;
+    }
+
+    const choice = event.target.closest(".choice-card");
+    if (choice?.dataset.id) {
+      selectNode(choice.dataset.id);
+      return;
+    }
+
+    if (event.target.closest("#backLineBtn")) {
+      const current = currentNode();
+      setSelectedNodeId(current?.parent_id || null);
+      selectedRepairId = null;
+      if (selectedId) populateEditor(nodeById(selectedId));
+      else populateEditor(null);
+      paint();
+      return;
+    }
+
+    if (event.target.closest("#rootLineBtn")) {
+      setSelectedNodeId(null);
+      selectedRepairId = null;
+      populateEditor(null);
+      paint();
+    }
+  });
+}
+
+const repairListEl = $("repairList");
+if (repairListEl) {
+  repairListEl.addEventListener("click", async event => {
+    const actionButton = event.target.closest("[data-action]");
+    const actionRow = event.target.closest("[data-id]");
+    if (!actionButton || !actionRow) return;
+
+    const repair = repairById(actionRow.dataset.id);
+    if (!repair) return;
+
+    const action = actionButton.dataset.action;
+
+    if (action === "edit") {
+      fillRepairForm(repair);
+      paint();
+      return;
+    }
+
+    if (action === "jump") {
+      if (repair.related_node_id) {
+        fillRepairForm(repair);
+        paint();
+      }
+      return;
+    }
+
+    if (action === "toggle") {
+      await OpeningDB.upsertRepairItem({
+        ...repair,
+        status: repair.status === "solved" ? "needs_work" : "solved"
+      });
+      await refresh();
+      return;
+    }
+
+    if (action === "delete" && confirm("Delete this repair loop?")) {
+      if (selectedRepairId === repair.id) {
+        selectedRepairId = null;
+        resetRepairForm({ keepSelectionLink: true });
+      }
+      await OpeningDB.deleteRepairItem(repair.id);
+      await refresh();
+    }
+  });
+}
+
+const newRootBtn = $("newRootBtn");
+if (newRootBtn) newRootBtn.addEventListener("click", resetEditorForNewRoot);
+
+const addChildBtn = $("addChildBtn");
+if (addChildBtn) {
+  addChildBtn.addEventListener("click", async () => {
+    if (!selectedId) return;
+
+    const child = {
+      id: crypto.randomUUID(),
+      parent_id: selectedId,
+      move: "New move",
+      title: "",
+      highlight_kind: "",
+      explanation: "",
+      tags: [],
+      exclude_from_training: false,
+      is_practice_card: true,
+      is_preferred: false,
+      created_at: new Date().toISOString()
+    };
+
+    await OpeningDB.upsertNode(child);
+    setSelectedNodeId(child.id);
+
     await refresh();
-  }
-});
+  });
+}
 
-$("newRootBtn").addEventListener("click", resetEditorForNewRoot);
+const deleteBtn = $("deleteBtn");
+if (deleteBtn) {
+  deleteBtn.addEventListener("click", async () => {
+    if (!selectedId || !confirm("Delete this move and all child lines?")) return;
 
-$("addChildBtn").addEventListener("click", async () => {
-  if (!selectedId) return;
+    const deletedNode = nodeById(selectedId);
+    setSelectedNodeId(deletedNode?.parent_id || null);
+    await OpeningDB.deleteNodeAndChildren(deletedNode.id);
 
-  const child = {
-    id: crypto.randomUUID(),
-    parent_id: selectedId,
-    move: "New move",
-    title: "",
-    highlight_kind: "",
-    explanation: "",
-    tags: [],
-    is_practice_card: true,
-    is_preferred: false,
-    created_at: new Date().toISOString()
-  };
-
-  await OpeningDB.upsertNode(child);
-  selectedId = child.id;
-
-  await refresh();
-});
-
-$("deleteBtn").addEventListener("click", async () => {
-  if (!selectedId || !confirm("Delete this move and all child lines?")) return;
-
-  const deletedNode = nodeById(selectedId);
-  selectedId = deletedNode?.parent_id || null;
-  await OpeningDB.deleteNodeAndChildren(deletedNode.id);
-
-  await refresh();
-});
-
-$("syncBtn").addEventListener("click", refresh);
-$("splitCompoundBtn").addEventListener("click", splitCompoundMovesOnce);
-$("newPromptBtn").addEventListener("click", () => queueTrainerPrompt());
-$("selectedPromptBtn").addEventListener("click", () => queueTrainerPrompt({ focusSelection: true }));
-$("revealPromptBtn").addEventListener("click", () => {
-  trainerRevealOpen = !trainerRevealOpen;
-  paintTrainer();
-});
-
-$("repairUseCurrentBtn").addEventListener("click", () => {
-  if (!currentNode()) {
-    setRepairLink(null, "");
-    return;
-  }
-
-  setRepairLink(currentNode().id, pathFor(currentNode()));
-});
-
-$("repairResetBtn").addEventListener("click", () => {
-  $("repairIdInput").value = "";
-  resetRepairForm({ keepSelectionLink: true });
-  paint();
-});
-
-repairFilterInput.addEventListener("change", renderRepairList);
-
-$("exportBtn").addEventListener("click", () => {
-  const blob = new Blob([JSON.stringify(backupPayload(), null, 2)], { type: "application/json" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = "gm-opening-tree-backup.json";
-  link.click();
-  URL.revokeObjectURL(link.href);
-});
-
-bindImportButton($("importBtn"), $("importInput"));
-
-$("importInput").addEventListener("change", async event => {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  try {
-    const text = await file.text();
-    const imported = parseImportedBackup(text);
-    await OpeningDB.saveAllNodes(imported.nodes);
-    await OpeningDB.saveAllRepairItems(imported.repairs);
-    selectedId = null;
-    selectedRepairId = null;
-    setTrainerPrompt(null);
     await refresh();
-    alert("Backup imported.");
-  } catch (error) {
-    console.error("Import failed:", error);
-    alert(`Import failed: ${error.message}`);
-  } finally {
-    event.target.value = "";
-  }
-});
+  });
+}
 
-populateEditor(null);
-resetRepairForm({ keepSelectionLink: false });
+const syncBtn = $("syncBtn");
+if (syncBtn) syncBtn.addEventListener("click", refresh);
+
+const splitCompoundBtn = $("splitCompoundBtn");
+if (splitCompoundBtn) splitCompoundBtn.addEventListener("click", splitCompoundMovesOnce);
+
+const newPromptBtn = $("newPromptBtn");
+if (newPromptBtn) newPromptBtn.addEventListener("click", () => queueTrainerPrompt());
+
+const selectedPromptBtn = $("selectedPromptBtn");
+if (selectedPromptBtn) selectedPromptBtn.addEventListener("click", () => queueTrainerPrompt({ focusSelection: true }));
+
+const revealPromptBtn = $("revealPromptBtn");
+if (revealPromptBtn) {
+  revealPromptBtn.addEventListener("click", () => {
+    trainerRevealOpen = !trainerRevealOpen;
+    paintTrainer();
+  });
+}
+
+const repairUseCurrentBtn = $("repairUseCurrentBtn");
+if (repairUseCurrentBtn) {
+  repairUseCurrentBtn.addEventListener("click", () => {
+    if (!currentNode()) {
+      setRepairLink(null, "");
+      paint();
+      return;
+    }
+
+    setRepairLink(currentNode().id, pathFor(currentNode()));
+    paint();
+  });
+}
+
+const repairResetBtn = $("repairResetBtn");
+if (repairResetBtn) {
+  repairResetBtn.addEventListener("click", () => {
+    if ($("repairIdInput")) $("repairIdInput").value = "";
+    resetRepairForm({ keepSelectionLink: true });
+    paint();
+  });
+}
+
+const repairFilterInput = $("repairFilterInput");
+if (repairFilterInput) repairFilterInput.addEventListener("change", renderRepairList);
+
+const exportBtn = $("exportBtn");
+if (exportBtn) {
+  exportBtn.addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(backupPayload(), null, 2)], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "gm-opening-tree-backup.json";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  });
+}
+
+const importBtn = $("importBtn");
+const importInput = $("importInput");
+if (importBtn && importInput) {
+  bindImportButton(importBtn, importInput);
+
+  importInput.addEventListener("change", async event => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const imported = parseImportedBackup(text);
+      await OpeningDB.saveAllNodes(imported.nodes);
+      await OpeningDB.saveAllRepairItems(imported.repairs);
+      setSelectedNodeId(null);
+      selectedRepairId = null;
+      setTrainerPrompt(null);
+      await refresh();
+      alert("Backup imported.");
+    } catch (error) {
+      console.error("Import failed:", error);
+      alert(`Import failed: ${error.message}`);
+    } finally {
+      event.target.value = "";
+    }
+  });
+}
+
+if ($("moveInput")) populateEditor(null);
+if ($("repairForm")) resetRepairForm({ keepSelectionLink: false });
 await refresh();

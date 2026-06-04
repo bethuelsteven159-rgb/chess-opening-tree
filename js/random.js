@@ -127,7 +127,7 @@ function renderBoard(node) {
 }
 
 function drawCard() {
-  const cards = nodes.filter(node => node.is_practice_card !== false);
+  const cards = nodes.filter(node => node.exclude_from_training !== true);
   const box = $("randomCard");
 
   if (!cards.length) {
@@ -137,7 +137,7 @@ function drawCard() {
     $("randomBoard").innerHTML = renderBoardSquares(boardFromFen(), null);
     $("randomBoardMeta").textContent = "White to move";
     box.className = "study-card empty";
-    box.innerHTML = "<p>No trainer cards yet. Go back to the dashboard and tick 'Use in trainer rotation' on some moves.</p>";
+    box.innerHTML = "<p>No trainer cards yet. Go back to the move editor and leave some moves available for training.</p>";
     return;
   }
 

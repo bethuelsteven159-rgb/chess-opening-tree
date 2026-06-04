@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GM Opening Tree - Training Mode</title>
+  <meta name="theme-color" content="#08111d" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
+  </script>
+  <link rel="stylesheet" href="styles.css?v=12" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+</head>
+<body class="app-page" data-page="training">
+  <div class="texture-grid"></div>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+
+  <header class="page-shell page-header">
+    <nav class="topbar">
+      <a class="brand brand-link" href="index.html">
+        <span class="logo">&#9823;</span>
+        <div>
+          <h1>GM Opening Tree</h1>
+          <p>Board-first trainer</p>
+        </div>
+      </a>
+
+      <div class="page-nav" aria-label="Primary">
+        <a class="nav-link" href="index.html">Dashboard</a>
+        <a class="nav-link" href="editor.html">Move Editor</a>
+        <a class="nav-link is-current" href="training.html">Training</a>
+        <a class="nav-link" href="repair.html">Repair Loop</a>
+      </div>
+
+      <div class="nav-actions">
+        <button id="themeToggleBtn" class="button button-secondary button-tiny" type="button">Light mode</button>
+        <button id="syncBtn" class="button button-primary button-tiny" type="button">Sync</button>
+        <button id="logoutBtn" class="button button-secondary button-tiny" type="button">Logout</button>
+      </div>
+    </nav>
+
+    <section class="panel page-intro-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Training mode</p>
+          <h2>Name the move from the board, not from memory fog.</h2>
+          <p class="muted">
+            Every eligible position can be drilled here, whether it came from openings, middlegames, or endgames.
+            Preferred child moves count as correct when several answers exist.
+          </p>
+        </div>
+
+        <div class="page-intro-meta">
+          <span id="trainerQueueCount" class="status-pill">0 training positions ready</span>
+        </div>
+      </div>
+    </section>
+  </header>
+
+  <main class="page-shell training-shell">
+    <section class="panel trainer-panel">
+      <div class="section-heading">
+        <div>
+          <h3>Board-first trainer</h3>
+          <p id="trainerSelectionStatus" class="muted">Prompts can come from anywhere in the tree, or focus on the line you selected in the move editor.</p>
+        </div>
+
+        <div class="stack-actions">
+          <button id="newPromptBtn" class="button button-primary button-tiny" type="button">New prompt</button>
+          <button id="selectedPromptBtn" class="button button-secondary button-tiny" type="button">Train selected</button>
+          <button id="revealPromptBtn" class="button button-ghost button-tiny" type="button">Reveal answer</button>
+          <a class="button button-ghost button-tiny" href="editor.html">Open move editor</a>
+        </div>
+      </div>
+
+      <div class="trainer-layout">
+        <div class="trainer-board-panel">
+          <div id="trainerTurnPill" class="mini-pill">White to move</div>
+          <div id="trainerBoard" class="chess-board compact" role="img" aria-label="Training chess board"></div>
+        </div>
+
+        <div class="trainer-info">
+          <div class="line-block">
+            <div class="line-label">Position</div>
+            <h4 id="trainerPositionTitle">Starting position</h4>
+            <div id="trainerPositionLine" class="line-strip"></div>
+          </div>
+
+          <div class="trainer-prompt-card">
+            <div class="prompt-copy">
+              <span class="prompt-label">What is the next move?</span>
+              <p id="trainerAcceptedMeta" class="muted">One repertoire move expected</p>
+            </div>
+
+            <form id="trainerForm" class="trainer-form">
+              <div class="trainer-answer-row">
+                <input id="trainerAnswerInput" placeholder="Bc4, Nf3, ...Bb6" autocomplete="off" />
+                <button id="trainerSubmitBtn" class="button button-primary" type="submit">Check</button>
+              </div>
+            </form>
+
+            <p id="trainerHint" class="trainer-hint"></p>
+            <div id="trainerFeedback"></div>
+            <div id="trainerReveal"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="page-shell page-footer">
+    <p>Prompt first, answer second, reveal the lesson only after you commit.</p>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/db.js"></script>
+  <script type="module" src="./js/app.js?v=12"></script>
+  <script>
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
+  </script>
+</body>
+</html>

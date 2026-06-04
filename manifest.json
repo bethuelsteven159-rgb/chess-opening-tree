@@ -5,7 +5,7 @@
   "display": "standalone",
   "background_color": "#08111d",
   "theme_color": "#08111d",
-  "description": "A private chess opening tree with board-first training and repair loops.",
+  "description": "A private chess study workspace with a dashboard, move editor, board-first training, random review, and repair loops.",
   "icons": [
     {
       "src": "assets/icon.svg",
@@ -19,6 +19,27 @@
       "short_name": "Review",
       "description": "Open a shuffled opening review card.",
       "url": "random.html",
+      "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Move Editor",
+      "short_name": "Editor",
+      "description": "Open the live board and move editor workspace.",
+      "url": "editor.html",
+      "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Training Mode",
+      "short_name": "Training",
+      "description": "Launch the board-first trainer.",
+      "url": "training.html",
+      "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Repair Loop",
+      "short_name": "Repair",
+      "description": "Review and update your mistake-to-lesson repair queue.",
+      "url": "repair.html",
       "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
     }
   ]

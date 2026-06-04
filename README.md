@@ -1,162 +1,202 @@
 # GM Opening Tree
 
-GM Opening Tree is now a private opening workspace built around one study loop:
+GM Opening Tree is now a private chess study workspace built around four separate jobs:
 
 1. Build the move tree.
-2. Mark the move you actually want to play.
-3. Train from the board, not from a text list.
-4. Turn every bad game into a repair note until the weakness is solved.
+2. Train the answer from the board.
+3. Review random cards fast.
+4. Repair mistakes until they stop repeating.
 
-It is still a small static app that works well on GitHub Pages, with Supabase for auth/data and localStorage fallbacks where useful.
+This version keeps those jobs on separate pages so the app can grow later into middlegame and endgame study without turning into one overloaded screen.
 
-## What Changed
+## What This Version Adds
 
-This version adds:
+- A real dashboard in `index.html` with four study lanes.
+- A dedicated `editor.html` page for line explorer, move editor, and live board.
+- A dedicated `training.html` page for board-first prompts.
+- A dedicated `repair.html` page for mistake -> lesson -> repair loops.
+- The existing `random.html` page kept as a separate quick-review deck.
+- Better board rendering so the bottom row is no longer clipped on compact boards.
+- Better white-piece contrast on the live board and compact boards.
+- Live board now shows:
+  - current move
+  - move type
+  - position status
+  - move explanation
+- Training now uses the opposite flag logic:
+  - moves are included by default
+  - only moves marked `Do not use for training` are skipped
+- Preferred moves are still accepted answers when a position branches.
+- Root white prompts and root black prompts are now trained separately, so white-first and black-first repertoire work does not get mixed.
+- The selected move now travels across pages, so you can pick a move in the editor and then use that same focus in training or repair.
 
-- A redesigned dashboard with better spacing, color direction, and stronger hierarchy.
-- Dark and light mode switching.
-- Logout buttons on every page.
-- Import / Export actions moved to the main top bar.
-- A cleaner `New root line` button that is easier to read.
-- Better live board contrast, especially for white pieces.
-- A `Preferred repertoire move` flag on each move.
-- A board-first trainer that asks for the next move from a position.
-- A repair journal for `Mistake -> Lesson -> Repair -> Status`.
-- Combined JSON backup support for both moves and repair items.
-
-## Pages
-
-- `index.html`
-  Main workspace.
-  This is where you manage the tree, edit moves, train from positions, and track repairs.
-
-- `random.html`
-  A quick review page for shuffled repertoire cards.
-  Good for mobile or short review sessions.
-
-- `login.html`
-  Private sign-in page for the allowed Google account.
-
-## File Map
+## Page Map
 
 - `index.html`
-  Main application shell.
+  Dashboard.
+  Shows the four study lanes and your current selected line.
+
+- `editor.html`
+  Move editor workspace.
+  Contains the live board, line explorer, and move-edit form.
+
+- `training.html`
+  Board-first trainer.
+  Prompts any eligible position from your tree.
+
+- `repair.html`
+  Repair loop workspace.
+  Keeps mistake notes connected to a board position.
 
 - `random.html`
-  Portable random-review page.
+  Quick random review page.
+  Good for short study bursts or mobile review.
 
 - `login.html`
-  Auth landing page.
+  Private auth page for the allowed Google account.
 
-- `styles.css`
-  Full shared design system for dashboard, login, and random review pages.
+## Main Workflow
 
-- `js/app.js`
-  Main workspace logic.
-  Handles the line explorer, live board, trainer mode, repair journal, import/export, and move editing.
+### 1. Dashboard
 
-- `js/random.js`
-  Random review page logic.
+Start on the dashboard and choose the kind of work you want to do:
 
-- `js/db.js`
-  Data layer.
-  Loads and saves opening moves plus repair items using Supabase when available, with local fallbacks where needed.
+- `Random cards`
+- `Move editor`
+- `Training mode`
+- `Repair loop`
 
-- `js/ui-shell.js`
-  Shared theme toggle, logout, and page chrome helpers.
+The dashboard is also where future middlegame and endgame modules can plug in later.
 
-- `js/board-tools.js`
-  Shared chess board and SAN parsing helpers used by the live board and trainer.
+### 2. Move Editor
 
-- `js/auth/only-me-guard.js`
-  Restricts access to the allowed Google account.
+Use `editor.html` when you want to build or clean the tree.
 
-- `js/auth/login.js`
-  Login flow for Google auth.
+You can:
 
-- `supabase/schema.sql`
-  Database schema and open testing policies.
+- explore the line
+- select a move
+- watch the live board update
+- edit explanation, title, and tags
+- mark a move as preferred
+- exclude a move from training
+- import JSON
+- export JSON
+- split compound moves
 
-## Core Study Workflow
+#### Move flags
 
-### 1. Line Explorer
+Each move now has two important checkboxes:
 
-Use the explorer to navigate the repertoire tree.
-
-- Click a move to select it.
-- The live board updates to that position.
-- The editor loads that move.
-- The trainer can use the selected position as a focused prompt source.
-
-### 2. Preferred Moves
-
-Every move can now be marked as:
-
-- `Use in trainer rotation`
 - `Preferred repertoire move`
+  This tells training mode which move belongs to your real repertoire when a position has multiple children.
 
-Why preferred moves matter:
+- `Do not use for training`
+  This keeps the move in the tree but removes it from:
+  - training prompts
+  - random review answer pools
 
-- If a position has multiple child moves, the trainer needs to know which answer belongs to your main repertoire.
-- If one or more child moves are marked preferred, the trainer accepts those preferred moves instead of every child.
-- This is the main fix for opening-tree branch conflicts during training.
+That means training is now opt-out, not opt-in.
 
-### 3. Board-First Trainer
+### 3. Live Board
 
-The trainer on the main page now works like this:
+The live board on `editor.html` now shows more than just the board:
 
-- It shows a board position.
-- It asks: `What is the next move?`
-- You type SAN like `Bc4`, `Nf3`, or `...Bb6`.
-- You get immediate feedback:
-  - `Correct`
-  - `Incorrect`
-  - Or a message telling you that your answer exists in the tree but is not the active repertoire answer for that prompt.
+- current move
+- move type
+- position status
+- move explanation
+- the full line up to that move
 
-Trainer behavior:
+This makes it easier to understand not only what move you are on, but what kind of move it is and why it matters.
 
-- Preferred moves are prioritized.
-- Positions with open repair notes are weighted more heavily.
-- You can generate a random prompt or train from the currently selected position.
-- Reveal shows accepted answers plus explanation notes.
+### 4. Training Mode
 
-### 4. Repair Loop
+`training.html` is now a proper board-first trainer.
 
-The repair journal is the practical version of:
+Flow:
 
-`Mistake -> Lesson -> Repair -> Solved / Needs work`
+1. See the board position.
+2. Read: `What is the next move?`
+3. Type the move in SAN.
+4. Get feedback:
+   - `Correct`
+   - `Incorrect`
+   - or a message saying the move exists in the tree but is not the active training answer
+
+#### Training rules
+
+- Any position can be trained:
+  - openings
+  - middlegames
+  - endgames
+- Both white and black repertoire positions are supported.
+- If a position has multiple preferred children, any preferred child counts as correct.
+- If a move is marked `Do not use for training`, it is skipped.
+- If a move exists in the tree but is excluded from training, the trainer tells you that explicitly.
+
+#### Important fix
+
+Root white moves and root black moves are now separated into different prompt groups.
+
+So:
+
+- white start prompts stay white
+- black first-move prompts stay black
+
+They no longer collide inside the same starting-position prompt.
+
+### 5. Random Review
+
+`random.html` still works as the quick one-card study page.
+
+It now benefits from the same data rules as training mode:
+
+- moves excluded from training are skipped
+- preferred moves are weighted higher
+- linked repair notes still surface on the card
+
+### 6. Repair Loop
+
+`repair.html` is the concrete fix page for bad games and recurring errors.
 
 Each repair item stores:
 
-- Linked move / position
-- Mistake
-- Lesson
-- Repair action
-- Status
+- linked move or line
+- mistake
+- lesson
+- repair action
+- status
 
-Good examples:
+Status options:
+
+- `Needs work`
+- `Solved`
+
+Use it like this:
+
+1. Select a move in `editor.html`.
+2. Open `repair.html`.
+3. Click `Use selected move`.
+4. Capture:
+   - the mistake
+   - the lesson
+   - the repair
+5. Leave it as `Needs work` until it is actually fixed in practice.
+
+Example:
 
 - Mistake: `Allowed ...d5 break in the Italian`
 - Lesson: `Need c3 before d4`
-- Repair: `Review 3 model games and drill the move order`
-
-Use it this way:
-
-1. Select the move or position that failed.
-2. Click `Attach selected move`.
-3. Write the mistake, lesson, and repair.
-4. Leave it as `Needs work` until it truly feels solved.
-5. Mark it `Solved` only after the issue stops showing up in your games and review.
-
-Open repairs linked to a move also appear in trainer prompts as reminders.
+- Repair: `Review three model games and drill the move order`
 
 ## JSON Backup Format
 
-Export now creates a single backup object:
+Export now creates one combined backup object:
 
 ```json
 {
-  "version": 3,
+  "version": 4,
   "exported_at": "2026-06-04T00:00:00.000Z",
   "nodes": [...],
   "repairs": [...]
@@ -165,115 +205,152 @@ Export now creates a single backup object:
 
 Import supports:
 
-- The new combined object format.
-- Older backups that were just an array of opening nodes.
+- the new combined backup format
+- older backups that only contain a nodes array
+
+## File Map
+
+- `index.html`
+  Dashboard shell.
+
+- `editor.html`
+  Editor workspace shell.
+
+- `training.html`
+  Trainer page shell.
+
+- `repair.html`
+  Repair workspace shell.
+
+- `random.html`
+  Random review page shell.
+
+- `login.html`
+  Auth page.
+
+- `styles.css`
+  Shared design system for all pages.
+
+- `js/app.js`
+  Shared protected-page controller.
+  Runs dashboard, editor, training, and repair logic.
+
+- `js/random.js`
+  Random review logic.
+
+- `js/db.js`
+  Data layer with Supabase support and local fallbacks.
+
+- `js/ui-shell.js`
+  Shared theme toggle and logout helpers.
+
+- `js/board-tools.js`
+  Board rendering and SAN parsing helpers.
+
+- `supabase/schema.sql`
+  Database schema and testing policies.
 
 ## Setup
 
 ### GitHub Pages
 
 1. Push the repo to GitHub.
-2. In GitHub repo settings, enable Pages from the `main` branch root.
+2. In repo settings, enable GitHub Pages from the `main` branch root.
 3. Open the deployed site URL.
 
 ### Supabase
 
 1. Create a Supabase project.
-2. Run `supabase/schema.sql` in the Supabase SQL Editor.
-3. Copy the project URL and anon public key from Supabase project settings.
-4. Paste them into `js/config.js`.
-5. Make sure Google auth is enabled in Supabase if you want login to work.
+2. Run `supabase/schema.sql` in the SQL Editor.
+3. Copy the project URL and anon public key into `js/config.js`.
+4. Enable Google auth in Supabase if you want login to work.
 
-## Important Migration Step For You
+## Important SQL Migration
 
-Because this version adds new data fields and a new table, you should run the updated SQL later if you have not already:
+This version adds and uses:
 
-- Adds `is_preferred` to `opening_nodes`
-- Creates the `repair_items` table
+- `repair_items`
+- `is_preferred`
+- `exclude_from_training`
 
-Until you run the updated SQL:
+It also keeps `is_practice_card` for compatibility with older data.
 
-- Preferred moves may still work locally but not persist fully online if the column is missing.
-- Repair notes will fall back to local storage if the `repair_items` table does not exist yet.
+The new SQL already backfills:
 
-So the main follow-up task for you is:
+- `exclude_from_training = not is_practice_card`
 
-1. Open Supabase SQL Editor.
-2. Run the updated `supabase/schema.sql`.
-3. Reload the app.
+So your older trainer data can move forward cleanly.
+
+### If you have not run the new SQL yet
+
+The app still tries to behave safely:
+
+- old `is_practice_card` data is still read
+- excluded-training logic is inferred from old data
+- repairs fall back locally if the table is missing
+
+But you should still run the new SQL so everything persists correctly online.
 
 ## Auth
 
 This project is intentionally private.
 
-- `only-me-guard.js` only allows the configured Google account email.
-- If another user signs in, they are signed out and sent back to login.
-- There is now a logout button on every page.
+- only the allowed Google account can enter
+- every protected page has a logout button
+- unauthorized users are signed out and redirected
 
-## Theme System
+## Theme
 
-The app now supports:
+The app supports:
 
-- Dark mode
-- Light mode
+- dark mode
+- light mode
 
-Theme choice is stored in localStorage and reused across pages.
+Theme preference is stored in localStorage and reused across pages.
 
-## Random Review Page
+## Split Moves Tool
 
-`random.html` is now styled to match the main app and includes:
+The `Split Moves` button is still on `editor.html`.
 
-- Theme toggle
-- Logout
-- Board preview
-- Random move card
-- Explanation reveal
-- Linked repair reminder when available
-
-## Split Compound Moves
-
-The `Split Moves` action is still available.
-
-Use it when you accidentally stored something like:
+Use it if you accidentally stored something like:
 
 `1... e5 2.Nf3`
 
-inside one move field instead of separate nodes.
-
-It converts compound text into separate child moves.
+inside one move cell instead of separate nodes.
 
 Recommendation:
 
-- Export a backup before using it.
+1. Export a backup first.
+2. Run `Split Moves`.
+3. Sync and inspect the result.
 
-## Current Design Notes
+## Current Design Direction
 
 This version intentionally leans into:
 
-- Warmer gold + teal accents instead of the earlier blue/purple feel
-- Stronger contrast and more readable glass panels
-- Better board visibility
-- Bigger visual separation between building, training, and repair work
+- warm gold + teal accents
+- cleaner glass panels
+- separate work pages instead of one overloaded board
+- future-ready navigation for more chess study domains
 
-## If You Want To Extend It Later
+## Good Future Extensions
 
-Good next steps:
+- spaced repetition history per position
+- model games linked to moves
+- middlegame plan modules
+- endgame drill modules
+- tags for tactical theme, structure, or move-order issue
+- auto-create repairs from game review intake
 
-- Track trainer performance history per position.
-- Add spaced-repetition intervals.
-- Store model games or reference PGNs per move.
-- Add repair tags like `opening`, `middlegame plan`, `move order`, `tactics`.
-- Add a dedicated game-loss intake form that creates repair items automatically.
+## Security Warning
 
-## One Important Warning
-
-The included Row Level Security policies are still open for testing:
+The included RLS policies are still open for solo testing:
 
 - read: open
 - insert: open
 - update: open
 - delete: open
 
-That is fine for solo prototyping, but not for a public multi-user product.
+That is okay for private prototyping, but not for a public multi-user product.
 
-When you are ready, tighten RLS so only your authenticated user can read and write this data.
+When you are ready, tighten RLS so only your authenticated user can read and write the data.

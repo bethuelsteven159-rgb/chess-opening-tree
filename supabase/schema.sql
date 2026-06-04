@@ -10,6 +10,7 @@ create table if not exists opening_nodes (
   highlight_kind text default '',
   tags text[] default '{}',
   is_practice_card boolean default true,
+  exclude_from_training boolean default false,
   is_preferred boolean default false,
   created_at timestamptz default now()
 );
@@ -19,8 +20,13 @@ alter table opening_nodes add column if not exists explanation text default '';
 alter table opening_nodes add column if not exists highlight_kind text default '';
 alter table opening_nodes add column if not exists tags text[] default '{}';
 alter table opening_nodes add column if not exists is_practice_card boolean default true;
+alter table opening_nodes add column if not exists exclude_from_training boolean default false;
 alter table opening_nodes add column if not exists is_preferred boolean default false;
 alter table opening_nodes add column if not exists created_at timestamptz default now();
+
+update opening_nodes
+set exclude_from_training = not coalesce(is_practice_card, true)
+where exclude_from_training is distinct from not coalesce(is_practice_card, true);
 
 create table if not exists repair_items (
   id uuid primary key default gen_random_uuid(),

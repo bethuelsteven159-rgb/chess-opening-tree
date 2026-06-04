@@ -12,7 +12,7 @@
   <script>
     document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
   </script>
-  <link rel="stylesheet" href="styles.css?v=11" />
+  <link rel="stylesheet" href="styles.css?v=12" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 </head>
@@ -24,12 +24,19 @@
   <header class="page-shell page-header">
     <nav class="topbar">
       <a class="brand brand-link" href="index.html">
-        <span class="logo">♟</span>
+        <span class="logo">&#9823;</span>
         <div>
           <h1>GM Opening Tree</h1>
-          <p>Pocket review deck</p>
+          <p>Random review deck</p>
         </div>
       </a>
+
+      <div class="page-nav" aria-label="Primary">
+        <a class="nav-link" href="index.html">Dashboard</a>
+        <a class="nav-link" href="editor.html">Move Editor</a>
+        <a class="nav-link" href="training.html">Training</a>
+        <a class="nav-link" href="repair.html">Repair Loop</a>
+      </div>
 
       <div class="nav-actions">
         <button id="themeToggleBtn" class="button button-secondary button-tiny" type="button">Light mode</button>
@@ -77,7 +84,7 @@
             <a class="button button-ghost" href="index.html">Back to dashboard</a>
           </div>
 
-          <p id="randomStatus" class="phone-note">Tip: use this page for quick reviews when you only want one clean prompt at a time.</p>
+          <p id="randomStatus" class="phone-note">Preferred moves are weighted more heavily so your main repertoire keeps resurfacing.</p>
         </div>
       </div>
     </section>
@@ -85,7 +92,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
-  <script type="module" src="./js/random.js?v=11"></script>
+  <script type="module" src="./js/random.js?v=12"></script>
   <script>
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
   </script>

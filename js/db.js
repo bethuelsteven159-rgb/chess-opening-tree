@@ -12,6 +12,7 @@ const seedNodes = [
     title: "King's Pawn Opening",
     explanation: "Claim the center, open the bishop and queen, and steer the repertoire toward active open games.",
     tags: ["White", "center", "classical"],
+    exclude_from_training: false,
     is_practice_card: true,
     is_preferred: true
   },
@@ -22,6 +23,7 @@ const seedNodes = [
     title: "Open Game vs 1.e4",
     explanation: "Meet central control with central control and keep your development fast and direct.",
     tags: ["Black", "1.e4", "classical"],
+    exclude_from_training: false,
     is_practice_card: true,
     is_preferred: true
   },
@@ -32,6 +34,7 @@ const seedNodes = [
     title: "Queen's Gambit family",
     explanation: "A practical answer to 1.d4 that keeps the structure healthy and the plans easy to remember.",
     tags: ["Black", "1.d4", "structure"],
+    exclude_from_training: false,
     is_practice_card: true,
     is_preferred: false
   }
@@ -45,6 +48,7 @@ seedNodes.push(
     title: "Develop and pressure e5",
     explanation: "Natural development, fast castling, and flexible central plans.",
     tags: ["development"],
+    exclude_from_training: false,
     is_practice_card: true,
     is_preferred: false
   },
@@ -55,6 +59,7 @@ seedNodes.push(
     title: "Italian setup idea",
     explanation: "Eye f7, build with c3 and d4, and keep the kingside pieces flowing naturally.",
     tags: ["Italian", "bishop"],
+    exclude_from_training: false,
     is_practice_card: true,
     is_preferred: true
   },
@@ -65,6 +70,7 @@ seedNodes.push(
     title: "Classical open games",
     explanation: "Expect Italian, Scotch, or Ruy Lopez structures and sharpen your tactical awareness.",
     tags: ["open games"],
+    exclude_from_training: false,
     is_practice_card: true,
     is_preferred: true
   },
@@ -75,6 +81,7 @@ seedNodes.push(
     title: "Queen's Gambit structures",
     explanation: "Challenge the center from the side and learn when to hold or release the pawn tension.",
     tags: ["QGD", "Slav"],
+    exclude_from_training: false,
     is_practice_card: true,
     is_preferred: true
   }
@@ -105,6 +112,11 @@ function normalizeTags(tags) {
 }
 
 function normalizeNode(node) {
+  const excludeFromTraining =
+    node.exclude_from_training === true ||
+    node.do_not_use_for_training === true ||
+    node.is_practice_card === false;
+
   return {
     id: node.id || crypto.randomUUID(),
     parent_id: node.parent_id || null,
@@ -113,7 +125,8 @@ function normalizeNode(node) {
     explanation: node.explanation || "",
     highlight_kind: ["blunder", "great", "brilliant"].includes(node.highlight_kind) ? node.highlight_kind : "",
     tags: normalizeTags(node.tags),
-    is_practice_card: node.is_practice_card !== false,
+    exclude_from_training: excludeFromTraining,
+    is_practice_card: !excludeFromTraining,
     is_preferred: node.is_preferred === true,
     created_at: node.created_at || new Date().toISOString()
   };
@@ -197,18 +210,23 @@ async function supportsColumn(client, table, columnName) {
 }
 
 async function openingNodeSupport(client, table) {
-  const [highlightKind, isPreferred] = await Promise.all([
+  const [highlightKind, isPreferred, excludeFromTraining, isPracticeCard] = await Promise.all([
     supportsColumn(client, table, "highlight_kind"),
-    supportsColumn(client, table, "is_preferred")
+    supportsColumn(client, table, "is_preferred"),
+    supportsColumn(client, table, "exclude_from_training"),
+    supportsColumn(client, table, "is_practice_card")
   ]);
 
-  return { highlightKind, isPreferred };
+  return { highlightKind, isPreferred, excludeFromTraining, isPracticeCard };
 }
 
 function stripUnsupportedNodeFields(node, support) {
   const row = { ...node };
   if (!support.highlightKind) delete row.highlight_kind;
   if (!support.isPreferred) delete row.is_preferred;
+  if (!support.excludeFromTraining) delete row.exclude_from_training;
+  if (support.isPracticeCard) row.is_practice_card = node.exclude_from_training !== true;
+  else delete row.is_practice_card;
   return row;
 }
 

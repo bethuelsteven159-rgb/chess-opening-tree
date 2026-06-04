@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GM Opening Tree - Move Editor</title>
+  <meta name="theme-color" content="#08111d" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
+  </script>
+  <link rel="stylesheet" href="styles.css?v=12" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+</head>
+<body class="app-page" data-page="editor">
+  <div class="texture-grid"></div>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+
+  <header class="page-shell page-header">
+    <nav class="topbar">
+      <a class="brand brand-link" href="index.html">
+        <span class="logo">&#9823;</span>
+        <div>
+          <h1>GM Opening Tree</h1>
+          <p>Move editor workspace</p>
+        </div>
+      </a>
+
+      <div class="page-nav" aria-label="Primary">
+        <a class="nav-link" href="index.html">Dashboard</a>
+        <a class="nav-link is-current" href="editor.html">Move Editor</a>
+        <a class="nav-link" href="training.html">Training</a>
+        <a class="nav-link" href="repair.html">Repair Loop</a>
+      </div>
+
+      <div class="nav-actions">
+        <button id="importBtn" class="button button-ghost button-tiny" type="button">Import JSON</button>
+        <button id="exportBtn" class="button button-ghost button-tiny" type="button">Export JSON</button>
+        <button id="splitCompoundBtn" class="button button-ghost button-tiny" type="button">Split Moves</button>
+        <button id="themeToggleBtn" class="button button-secondary button-tiny" type="button">Light mode</button>
+        <button id="syncBtn" class="button button-primary button-tiny" type="button">Sync</button>
+        <button id="logoutBtn" class="button button-secondary button-tiny" type="button">Logout</button>
+      </div>
+    </nav>
+
+    <input id="importInput" class="hidden-file-input" type="file" accept="application/json" />
+
+    <section class="panel page-intro-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Move editor</p>
+          <h2>Build and annotate the exact line you want to trust over the board.</h2>
+          <p class="muted">
+            The live board follows your selection, preferred moves define the training answer, and do-not-train keeps side branches out of your drilling queue.
+          </p>
+        </div>
+
+        <div class="page-intro-meta">
+          <span class="status-pill">Explorer + editor + live board</span>
+        </div>
+      </div>
+    </section>
+  </header>
+
+  <section class="page-shell live-board-shell">
+    <div class="panel live-board-panel">
+      <div class="live-board-heading">
+        <div>
+          <p class="eyebrow">Live board</p>
+          <h3 id="liveBoardTitle">Root position</h3>
+          <p id="liveBoardSubtitle" class="muted">The live board follows the move you select in Line Explorer.</p>
+        </div>
+        <div id="liveBoardMeta" class="status-pill">White to move</div>
+      </div>
+
+      <div class="live-board-layout">
+        <div class="board-stage">
+          <div class="board-frame">
+            <div id="liveBoard" class="chess-board" role="img" aria-label="Live chess board"></div>
+          </div>
+        </div>
+
+        <div class="board-sidebar">
+          <div class="board-detail-grid board-detail-grid-triple">
+            <article class="board-detail-card">
+              <span class="board-detail-label">Current move</span>
+              <strong id="liveMoveValue">Root view</strong>
+              <p id="liveMoveCaption">Choose a move in the explorer to jump the position here.</p>
+            </article>
+
+            <article class="board-detail-card">
+              <span class="board-detail-label">Move type</span>
+              <strong id="liveMoveTypeValue">Start position</strong>
+              <p id="liveMoveTypeCaption">Preferred, highlighted, and tagged move details appear here.</p>
+            </article>
+
+            <article class="board-detail-card">
+              <span class="board-detail-label">Position status</span>
+              <strong id="liveTurnValue">White to move</strong>
+              <p id="liveStatusValue">Starting position.</p>
+            </article>
+          </div>
+
+          <article class="board-detail-card board-detail-wide">
+            <span class="board-detail-label">Move explanation</span>
+            <strong id="liveExplanationTitle">Study note</strong>
+            <p id="liveExplanationText">Select a move to surface its plans, tactical ideas, and move-order explanation.</p>
+          </article>
+
+          <div class="line-block board-line-block">
+            <div class="line-label">Board line</div>
+            <div id="liveBoardLine" class="line-strip">
+              <div class="line-empty">No move selected yet. The board is ready at the start position.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main class="page-shell workspace-shell">
+    <aside class="panel tree-panel">
+      <div class="panel-heading">
+        <div>
+          <h3>Line Explorer</h3>
+          <p class="subheading">Select a move to inspect the board, then move through the tree one branch at a time.</p>
+        </div>
+        <button id="newRootBtn" class="button button-secondary button-tiny button-soft-accent" type="button">Add root line</button>
+      </div>
+      <div id="tree" class="tree"></div>
+    </aside>
+
+    <section class="panel editor-panel">
+      <div class="panel-heading">
+        <div>
+          <h3 id="editorTitle">Select a move</h3>
+          <p id="editorContext" class="subheading">Create a root move or select an existing move to edit its details.</p>
+        </div>
+        <button id="deleteBtn" class="button button-danger button-tiny" type="button" disabled>Delete</button>
+      </div>
+
+      <form id="moveForm" class="move-form">
+        <label>
+          Move SAN
+          <input id="moveInput" placeholder="e4, Nf3, Bb5..." required />
+        </label>
+
+        <label>
+          Title
+          <input id="titleInput" placeholder="Italian setup, anti-Berlin plan, Lucena bridge..." />
+        </label>
+
+        <label>
+          Move highlight
+          <select id="highlightInput">
+            <option value="">Normal / no highlight</option>
+            <option value="blunder">Blunder</option>
+            <option value="great">Great move</option>
+            <option value="brilliant">Brilliant</option>
+          </select>
+        </label>
+
+        <label>
+          Explanation
+          <textarea id="explanationInput" rows="7" placeholder="Why is this move good? Plans, structures, tactics, move-order points, typical middlegame ideas..."></textarea>
+        </label>
+
+        <label>
+          Tags
+          <input id="tagsInput" placeholder="Italian, center, initiative, kingside..." />
+        </label>
+
+        <div class="form-grid two-up">
+          <label class="check-row">
+            <input id="preferredInput" type="checkbox" />
+            <span>
+              Preferred repertoire move
+              <small>The trainer accepts preferred moves when a position branches into multiple candidate children.</small>
+            </span>
+          </label>
+
+          <label class="check-row">
+            <input id="excludeTrainingInput" type="checkbox" />
+            <span>
+              Do not use for training
+              <small>Keep the move in the tree, but remove it from training mode and random review answer pools.</small>
+            </span>
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button class="button button-primary" type="submit">Save move</button>
+          <button id="addChildBtn" class="button button-secondary" type="button" disabled>Add child move</button>
+          <a class="button button-ghost" href="training.html">Open training mode</a>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <footer class="page-shell page-footer">
+    <p>Build the move, explain the move, then train the board position later.</p>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/db.js"></script>
+  <script type="module" src="./js/app.js?v=12"></script>
+  <script>
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
+  </script>
+</body>
+</html>
