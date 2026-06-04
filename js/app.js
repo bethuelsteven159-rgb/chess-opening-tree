@@ -8,6 +8,31 @@ let selectedId = null;
 const $ = id => document.getElementById(id);
 const treeEl = $("tree");
 const form = $("moveForm");
+const liveBoardEl = $("liveBoard");
+const liveBoardTitleEl = $("liveBoardTitle");
+const liveBoardSubtitleEl = $("liveBoardSubtitle");
+const liveBoardMetaEl = $("liveBoardMeta");
+const liveMoveValueEl = $("liveMoveValue");
+const liveMoveCaptionEl = $("liveMoveCaption");
+const liveTurnValueEl = $("liveTurnValue");
+const liveStatusValueEl = $("liveStatusValue");
+const liveBoardLineEl = $("liveBoardLine");
+
+const BOARD_FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
+const BOARD_RANKS = [8, 7, 6, 5, 4, 3, 2, 1];
+const STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
+const PIECE_SYMBOLS = {
+  w: { p: "&#9817;", r: "&#9814;", n: "&#9816;", b: "&#9815;", q: "&#9813;", k: "&#9812;" },
+  b: { p: "&#9823;", r: "&#9820;", n: "&#9822;", b: "&#9821;", q: "&#9819;", k: "&#9818;" }
+};
+const PIECE_NAMES = {
+  p: "pawn",
+  r: "rook",
+  n: "knight",
+  b: "bishop",
+  q: "queen",
+  k: "king"
+};
 
 const highlightLabels = {
   blunder: "Blunder",
@@ -155,6 +180,262 @@ async function splitCompoundMovesOnce() {
   alert(`Done. Split ${splitNodeCount} move cell(s) and created ${addedNodeCount} extra child node(s).`);
 }
 
+function createChessGame(startingTurn = "w") {
+  if (typeof window.Chess !== "function") return null;
+
+  try {
+    const game = new window.Chess();
+
+    if (startingTurn === "b" && typeof game.load === "function") {
+      game.load(`${STARTING_FEN} b KQkq - 0 1`);
+    }
+    return game;
+  } catch {
+    try {
+      if (startingTurn === "b") {
+        return new window.Chess(`${STARTING_FEN} b KQkq - 0 1`);
+      }
+      return new window.Chess();
+    } catch {
+      return null;
+    }
+  }
+}
+
+function boardFromFen(placement = STARTING_FEN) {
+  return String(placement)
+    .split("/")
+    .map(rankText => {
+      const row = [];
+
+      for (const char of rankText) {
+        const emptyCount = Number(char);
+        if (Number.isInteger(emptyCount) && emptyCount > 0) {
+          for (let i = 0; i < emptyCount; i += 1) row.push(null);
+          continue;
+        }
+
+        row.push({
+          color: char === char.toUpperCase() ? "w" : "b",
+          type: char.toLowerCase()
+        });
+      }
+
+      return row;
+    });
+}
+
+function boardRowsFromGame(game) {
+  if (typeof game?.board === "function") {
+    return game.board().map(row => row.map(piece => (
+      piece ? { color: piece.color, type: piece.type } : null
+    )));
+  }
+
+  const [placement = STARTING_FEN] = String(game?.fen?.() || STARTING_FEN).split(" ");
+  return boardFromFen(placement);
+}
+
+function sanCandidates(moveText) {
+  const clean = String(moveText || "")
+    .trim()
+    .replace(/^\d+\.(?:\.\.)?\s*/, "")
+    .replace(/^\.\.\.\s*/, "")
+    .replace(/0-0-0/g, "O-O-O")
+    .replace(/0-0/g, "O-O")
+    .replace(/e\.p\.?/gi, "")
+    .replace(/[!?]+/g, "")
+    .trim();
+
+  const compact = clean.replace(/\s+/g, "");
+  const noSuffix = compact.replace(/[+#]+$/, "");
+
+  return [...new Set([clean, compact, noSuffix].filter(Boolean))];
+}
+
+function tryApplyMove(game, moveText) {
+  for (const san of sanCandidates(moveText)) {
+    try {
+      const moved = game.move(san, { sloppy: true });
+      if (moved) return moved;
+    } catch {}
+
+    try {
+      const moved = game.move(san);
+      if (moved) return moved;
+    } catch {}
+  }
+
+  return null;
+}
+
+function pathMoveParts(path) {
+  return path.flatMap(node =>
+    splitMoveParts(node.move)
+      .map(part => ({ node, part }))
+      .filter(entry => entry.part.trim())
+  );
+}
+
+function playPathFromTurn(path, startingTurn = "w") {
+  const game = createChessGame(startingTurn);
+  if (!game) return null;
+
+  const history = [];
+  let lastMove = null;
+  let failedMove = "";
+
+  for (const entry of pathMoveParts(path)) {
+    const moved = tryApplyMove(game, entry.part);
+    if (!moved) {
+      failedMove = entry.part;
+      break;
+    }
+
+    history.push(moved);
+    lastMove = moved;
+  }
+
+  return { game, history, lastMove, failedMove, startingTurn };
+}
+
+function bestBoardAttempt(path) {
+  if (!path.length) {
+    return playPathFromTurn([], "w");
+  }
+
+  const preferredTurns = /\.\.\./.test(String(path[0]?.move || "")) ? ["b", "w"] : ["w", "b"];
+  const totalParts = pathMoveParts(path).length;
+  let best = null;
+
+  for (const turn of preferredTurns) {
+    const attempt = playPathFromTurn(path, turn);
+    if (!attempt) continue;
+
+    const isComplete = !attempt.failedMove && attempt.history.length === totalParts;
+    if (isComplete) return attempt;
+
+    if (!best || attempt.history.length > best.history.length) {
+      best = attempt;
+    }
+  }
+
+  return best;
+}
+
+function colorToMoveText(turn) {
+  return turn === "b" ? "Black to move" : "White to move";
+}
+
+function squareLabel(file, rank, piece) {
+  if (!piece) return `${file}${rank} empty`;
+  const color = piece.color === "w" ? "White" : "Black";
+  return `${file}${rank} ${color} ${PIECE_NAMES[piece.type] || "piece"}`;
+}
+
+function renderBoardSquares(rows, lastMove) {
+  const lastFrom = lastMove?.from || "";
+  const lastTo = lastMove?.to || "";
+
+  return rows.map((row, rowIndex) => (
+    row.map((piece, colIndex) => {
+      const file = BOARD_FILES[colIndex];
+      const rank = BOARD_RANKS[rowIndex];
+      const square = `${file}${rank}`;
+      const classes = [
+        "board-square",
+        (rowIndex + colIndex) % 2 === 0 ? "light" : "dark",
+        colIndex === 0 ? "show-rank" : "",
+        rowIndex === BOARD_RANKS.length - 1 ? "show-file" : "",
+        square === lastFrom ? "last-from" : "",
+        square === lastTo ? "last-to" : ""
+      ].filter(Boolean).join(" ");
+
+      const pieceHtml = piece
+        ? `<span class="piece ${piece.color === "w" ? "white" : "black"}">${PIECE_SYMBOLS[piece.color][piece.type]}</span>`
+        : "";
+
+      return `
+        <div
+          class="${classes}"
+          data-file="${rowIndex === BOARD_RANKS.length - 1 ? file : ""}"
+          data-rank="${colIndex === 0 ? rank : ""}"
+          aria-label="${squareLabel(file, rank, piece)}"
+        >
+          ${pieceHtml}
+        </div>`;
+    }).join("")
+  )).join("");
+}
+
+function renderBoardLine(path) {
+  if (!path.length) {
+    return `<div class="line-empty">No move selected yet. The board is ready at the start position.</div>`;
+  }
+
+  return path.map(node => {
+    const active = node.id === selectedId ? "active" : "";
+    return `
+      <span class="line-chip ${active}">
+        <span>${escapeHtml(node.move)}</span>
+        ${highlightBadgeHtml(node.highlight_kind || "")}
+      </span>`;
+  }).join("");
+}
+
+function paintLiveBoard() {
+  if (!liveBoardEl) return;
+
+  const current = currentNode();
+  const path = current ? pathNodesFor(current) : [];
+  const attempt = bestBoardAttempt(path);
+  const game = attempt?.game || createChessGame("w");
+  const boardReady = Boolean(game);
+  const rows = game ? boardRowsFromGame(game) : boardFromFen();
+  const historyLength = attempt?.history.length || 0;
+  const moveValue = current ? current.move : "Root view";
+  const titleValue = current ? `Position after ${current.move}` : "Root position";
+  const turnValue = boardReady ? colorToMoveText(game.turn()) : "Board waiting for chess.js";
+
+  let subtitleValue = "The board follows the move you select in Line Explorer.";
+  if (!boardReady) {
+    subtitleValue = "The board frame is ready, but the chess move parser did not load in this browser session.";
+  } else if (current?.title) {
+    subtitleValue = current.title;
+  } else if (attempt?.failedMove) {
+    subtitleValue = `The board synced until ${attempt.failedMove}, then stopped because that move could not be read as SAN.`;
+  } else if (path.length) {
+    subtitleValue = `Synced to your current line after ${historyLength} half-move${historyLength === 1 ? "" : "s"}.`;
+  }
+
+  let statusValue = "Starting position.";
+  if (!boardReady) {
+    statusValue = "Showing the starting board until the chess library is available.";
+  } else if (attempt?.failedMove) {
+    statusValue = `Stopped before ${attempt.failedMove}.`;
+  } else if (historyLength) {
+    if (typeof game?.in_checkmate === "function" && game.in_checkmate()) {
+      statusValue = "Checkmate on the board.";
+    } else if (typeof game?.in_draw === "function" && game.in_draw()) {
+      statusValue = "Drawn position.";
+    } else if (typeof game?.in_check === "function" && game.in_check()) {
+      statusValue = `${game.turn() === "w" ? "White" : "Black"} is in check.`;
+    } else {
+      statusValue = `Line depth: ${historyLength} half-move${historyLength === 1 ? "" : "s"}.`;
+    }
+  }
+
+  liveBoardTitleEl.textContent = titleValue;
+  liveBoardSubtitleEl.textContent = subtitleValue;
+  liveBoardMetaEl.textContent = boardReady && historyLength ? `${turnValue} / ${historyLength} ply` : turnValue;
+  liveMoveValueEl.textContent = moveValue;
+  liveMoveCaptionEl.textContent = current ? (current.title || pathFor(current)) : "Choose any move in the explorer to jump the position here.";
+  liveTurnValueEl.textContent = turnValue;
+  liveStatusValueEl.textContent = statusValue;
+  liveBoardLineEl.innerHTML = renderBoardLine(path);
+  liveBoardEl.innerHTML = renderBoardSquares(rows, attempt?.lastMove || null);
+}
+
 function renderStats() {
   $("nodeCount").textContent = nodes.length;
   $("cardCount").textContent = nodes.filter(n => n.is_practice_card).length;
@@ -233,6 +514,7 @@ function renderChoices() {
 function paint() {
   treeEl.innerHTML = renderChoices();
   renderStats();
+  paintLiveBoard();
 }
 
 function selectNode(id, shouldPaint = true) {

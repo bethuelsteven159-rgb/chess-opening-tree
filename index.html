@@ -42,6 +42,50 @@
     </section>
   </header>
 
+  <section class="live-board-shell">
+    <div class="panel live-board-panel">
+      <div class="live-board-heading">
+        <div>
+          <p class="eyebrow">Live board</p>
+          <h3 id="liveBoardTitle">Root position</h3>
+          <p id="liveBoardSubtitle" class="muted">The board follows the move you select in Line Explorer.</p>
+        </div>
+        <div id="liveBoardMeta" class="board-meta-pill">White to move</div>
+      </div>
+
+      <div class="live-board-layout">
+        <div class="board-stage">
+          <div class="board-frame">
+            <div id="liveBoard" class="chess-board" role="img" aria-label="Live chess board"></div>
+          </div>
+        </div>
+
+        <div class="board-sidebar">
+          <div class="board-detail-grid">
+            <article class="board-detail-card">
+              <span class="board-detail-label">Current move</span>
+              <strong id="liveMoveValue">Root view</strong>
+              <p id="liveMoveCaption">Choose any move in the explorer to jump the position here.</p>
+            </article>
+
+            <article class="board-detail-card">
+              <span class="board-detail-label">Position status</span>
+              <strong id="liveTurnValue">White to move</strong>
+              <p id="liveStatusValue">Starting position.</p>
+            </article>
+          </div>
+
+          <div class="line-block board-line-block">
+            <div class="line-label">Board line</div>
+            <div id="liveBoardLine" class="line-strip">
+              <div class="line-empty">No move selected yet. The board is ready at the start position.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <main class="app-shell">
     <aside class="panel tree-panel">
       <div class="panel-heading">
@@ -120,6 +164,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
   <script type="module" src="./js/app.js?v=7"></script>
   <script>
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js');
