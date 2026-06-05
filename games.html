@@ -12,7 +12,7 @@
   <script>
     document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
   </script>
-  <link rel="stylesheet" href="styles.css?v=16" />
+  <link rel="stylesheet" href="styles.css?v=17" />
   <script src="vendor/supabase-js.min.js"></script>
   <script src="vendor/chess.min.js"></script>
 </head>
@@ -71,130 +71,57 @@
 
   <main class="page-shell games-shell">
     <section class="games-workspace">
-      <div class="games-left-rail">
-        <section class="panel game-meta-panel">
-          <div class="section-heading side-panel-heading">
-            <div>
-              <h3>Game meta</h3>
-              <p class="muted">Store the overall lesson and track how far the analysis is finished.</p>
-            </div>
-
-            <div class="stack-actions side-panel-actions">
-              <button id="saveGameMetaBtn" class="button button-secondary button-tiny" type="button">Save meta</button>
-              <button id="deleteGameBtn" class="button button-danger button-tiny" type="button">Delete game</button>
-            </div>
+      <section class="panel game-import-panel">
+        <div class="section-heading side-panel-heading">
+          <div>
+            <h3>PGN intake</h3>
+            <p class="muted">Paste a full PGN or import one from a file, then lock in which color you played before saving it.</p>
           </div>
 
-          <div class="game-meta-body">
-            <div class="game-meta-grid">
-              <label>
-                Analysis status
-                <select id="analysisStatusInput">
-                  <option value="imported_only">Imported only</option>
-                  <option value="quick_classified">Quick classified</option>
-                  <option value="human_analysis_started">Human analysis started</option>
-                  <option value="human_analysis_complete">Human analysis complete</option>
-                  <option value="engine_checked_later">Engine checked later</option>
-                  <option value="lessons_extracted">Lessons extracted</option>
-                  <option value="repairs_created">Repairs created</option>
-                </select>
-              </label>
-
-              <label>
-                Summary lesson
-                <textarea id="gameSummaryInput" rows="5" placeholder="Where did the game turn, what theme mattered, and what must be remembered next time?"></textarea>
-              </label>
-            </div>
+          <div class="stack-actions side-panel-actions">
+            <button id="importGameBtn" class="button button-primary button-tiny" type="button">Import game</button>
           </div>
-        </section>
+        </div>
 
-        <section class="panel annotation-panel">
-          <div class="section-heading side-panel-heading">
-            <div>
-              <h3>Move-by-move human notes</h3>
-              <p id="annotationEditorStatus" class="muted">Select a move in the replay to record what you thought, feared, or missed.</p>
-            </div>
+        <div class="game-import-body">
+          <div class="game-import-grid">
+            <label>
+              I played
+              <select id="gameUserColorInput">
+                <option value="white">White</option>
+                <option value="black">Black</option>
+              </select>
+            </label>
 
-            <div class="stack-actions side-panel-actions">
-              <button id="saveAnnotationBtn" class="button button-primary button-tiny" type="button">Save move note</button>
-            </div>
+            <label>
+              Platform
+              <input id="gamePlatformInput" placeholder="Lichess, Chess.com, OTB event..." />
+            </label>
+
+            <label>
+              Tags
+              <input id="gameTagsInput" placeholder="Italian, rapid, tournament, nerves..." />
+            </label>
           </div>
 
-          <div id="annotationHintBanner" class="repair-link-banner">No move selected yet.</div>
+          <label class="game-pgn-field">
+            PGN
+            <textarea id="pgnInput" rows="12" placeholder='[Event "Weekend Rapid"]&#10;[White "Me"]&#10;[Black "Opponent"]&#10;1. e4 e5 2. Nf3 Nc6 3. Bc4 ...'></textarea>
+          </label>
+        </div>
+      </section>
 
-          <div class="annotation-scroll">
-            <div class="annotation-grid">
-              <label>
-                What I thought before the move
-                <textarea id="humanBeforeInput" rows="4" placeholder="What was I calculating, fearing, or misunderstanding here?"></textarea>
-              </label>
-
-              <label>
-                What I learned after the move
-                <textarea id="humanAfterInput" rows="4" placeholder="What is the human lesson from this moment?"></textarea>
-              </label>
-
-              <label>
-                Candidate moves
-                <input id="candidateMovesInput" placeholder="Nf3, d4, Qe2..." />
-              </label>
-
-              <label>
-                Rejected candidates
-                <input id="rejectedMovesInput" placeholder="Bxf7+, h3..." />
-              </label>
-
-              <label>
-                Expected reply
-                <input id="expectedReplyInput" placeholder="...d5, ...Nf6, ...Qe7..." />
-              </label>
-
-              <label>
-                Actual reply / board reality
-                <input id="actualReplyInput" placeholder="What actually happened or what reply I missed." />
-              </label>
-
-              <label>
-                Human evaluation
-                <input id="evaluationInput" placeholder="Better for White, unclear, equal but easier for Black..." />
-              </label>
-
-              <label>
-                Confidence / emotional state
-                <input id="confidenceInput" placeholder="Confident, rushed, low time, nervous..." />
-              </label>
-
-              <label>
-                Critical moment type
-                <input id="criticalTypeInput" placeholder="Opening confusion, missed candidate, time trouble..." />
-              </label>
-
-              <label>
-                Emotional state detail
-                <input id="emotionalStateInput" placeholder="Fear of complications, impatience, tilt..." />
-              </label>
-            </div>
-
-            <div class="form-grid two-up annotation-check-grid">
-              <label class="check-row">
-                <input id="criticalMomentInput" type="checkbox" />
-                <span>
-                  Critical moment
-                  <small>Mark the moment where the game direction changed or your understanding was tested hardest.</small>
-                </span>
-              </label>
-
-              <label class="check-row">
-                <input id="mistakeFlagInput" type="checkbox" />
-                <span>
-                  Mistake / lesson marker
-                  <small>Use this when the move should become a saved mistake, reusable lesson, or future repair task.</small>
-                </span>
-              </label>
-            </div>
+      <aside class="panel game-list-panel">
+        <div class="section-heading">
+          <div>
+            <h3>Saved games</h3>
+            <p class="muted">Select a game to replay it and extract lessons.</p>
           </div>
-        </section>
-      </div>
+          <span id="gameQueueBadge" class="status-pill">0 need work</span>
+        </div>
+
+        <div id="gameList" class="game-list"></div>
+      </aside>
 
       <section class="panel game-replay-panel">
         <div class="live-board-heading">
@@ -255,55 +182,126 @@
         </div>
       </section>
 
-      <aside class="panel game-list-panel">
-        <div class="section-heading">
-          <div>
-            <h3>Saved games</h3>
-            <p class="muted">Select a game to replay it and extract lessons.</p>
-          </div>
-          <span id="gameQueueBadge" class="status-pill">0 need work</span>
-        </div>
-
-        <div id="gameList" class="game-list"></div>
-      </aside>
-
-      <section class="panel game-import-panel">
+      <section class="panel game-meta-panel">
         <div class="section-heading side-panel-heading">
           <div>
-            <h3>PGN intake</h3>
-            <p class="muted">Paste a full PGN or import one from a file, then lock in which color you played before saving it.</p>
+            <h3>Game meta</h3>
+            <p class="muted">Store the overall lesson and track how far the analysis is finished.</p>
           </div>
 
           <div class="stack-actions side-panel-actions">
-            <button id="importGameBtn" class="button button-primary button-tiny" type="button">Import game</button>
+            <button id="saveGameMetaBtn" class="button button-secondary button-tiny" type="button">Save meta</button>
+            <button id="deleteGameBtn" class="button button-danger button-tiny" type="button">Delete game</button>
           </div>
         </div>
 
-        <div class="game-import-body">
-          <div class="game-import-grid">
+        <div class="game-meta-body">
+          <div class="game-meta-grid">
             <label>
-              I played
-              <select id="gameUserColorInput">
-                <option value="white">White</option>
-                <option value="black">Black</option>
+              Analysis status
+              <select id="analysisStatusInput">
+                <option value="imported_only">Imported only</option>
+                <option value="quick_classified">Quick classified</option>
+                <option value="human_analysis_started">Human analysis started</option>
+                <option value="human_analysis_complete">Human analysis complete</option>
+                <option value="engine_checked_later">Engine checked later</option>
+                <option value="lessons_extracted">Lessons extracted</option>
+                <option value="repairs_created">Repairs created</option>
               </select>
             </label>
 
             <label>
-              Platform
-              <input id="gamePlatformInput" placeholder="Lichess, Chess.com, OTB event..." />
+              Summary lesson
+              <textarea id="gameSummaryInput" rows="5" placeholder="Where did the game turn, what theme mattered, and what must be remembered next time?"></textarea>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel annotation-panel">
+        <div class="section-heading side-panel-heading">
+          <div>
+            <h3>Move-by-move human notes</h3>
+            <p id="annotationEditorStatus" class="muted">Select a move in the replay to record what you thought, feared, or missed.</p>
+          </div>
+
+          <div class="stack-actions side-panel-actions">
+            <button id="saveAnnotationBtn" class="button button-primary button-tiny" type="button">Save move note</button>
+          </div>
+        </div>
+
+        <div id="annotationHintBanner" class="repair-link-banner">No move selected yet.</div>
+
+        <div class="annotation-scroll">
+          <div class="annotation-grid">
+            <label>
+              What I thought before the move
+              <textarea id="humanBeforeInput" rows="4" placeholder="What was I calculating, fearing, or misunderstanding here?"></textarea>
             </label>
 
             <label>
-              Tags
-              <input id="gameTagsInput" placeholder="Italian, rapid, tournament, nerves..." />
+              What I learned after the move
+              <textarea id="humanAfterInput" rows="4" placeholder="What is the human lesson from this moment?"></textarea>
+            </label>
+
+            <label>
+              Candidate moves
+              <input id="candidateMovesInput" placeholder="Nf3, d4, Qe2..." />
+            </label>
+
+            <label>
+              Rejected candidates
+              <input id="rejectedMovesInput" placeholder="Bxf7+, h3..." />
+            </label>
+
+            <label>
+              Expected reply
+              <input id="expectedReplyInput" placeholder="...d5, ...Nf6, ...Qe7..." />
+            </label>
+
+            <label>
+              Actual reply / board reality
+              <input id="actualReplyInput" placeholder="What actually happened or what reply I missed." />
+            </label>
+
+            <label>
+              Human evaluation
+              <input id="evaluationInput" placeholder="Better for White, unclear, equal but easier for Black..." />
+            </label>
+
+            <label>
+              Confidence / emotional state
+              <input id="confidenceInput" placeholder="Confident, rushed, low time, nervous..." />
+            </label>
+
+            <label>
+              Critical moment type
+              <input id="criticalTypeInput" placeholder="Opening confusion, missed candidate, time trouble..." />
+            </label>
+
+            <label>
+              Emotional state detail
+              <input id="emotionalStateInput" placeholder="Fear of complications, impatience, tilt..." />
             </label>
           </div>
 
-          <label class="game-pgn-field">
-            PGN
-            <textarea id="pgnInput" rows="16" placeholder='[Event "Weekend Rapid"]&#10;[White "Me"]&#10;[Black "Opponent"]&#10;1. e4 e5 2. Nf3 Nc6 3. Bc4 ...'></textarea>
-          </label>
+          <div class="form-grid two-up annotation-check-grid">
+            <label class="check-row">
+              <input id="criticalMomentInput" type="checkbox" />
+              <span>
+                Critical moment
+                <small>Mark the moment where the game direction changed or your understanding was tested hardest.</small>
+              </span>
+            </label>
+
+            <label class="check-row">
+              <input id="mistakeFlagInput" type="checkbox" />
+              <span>
+                Mistake / lesson marker
+                <small>Use this when the move should become a saved mistake, reusable lesson, or future repair task.</small>
+              </span>
+            </label>
+          </div>
         </div>
       </section>
     </section>
@@ -315,7 +313,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
-  <script type="module" src="./js/games.js?v=16"></script>
+  <script type="module" src="./js/games.js?v=17"></script>
   <script>
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
   </script>

@@ -1698,25 +1698,22 @@ select:focus {
 
 .games-workspace {
   display: grid;
-  grid-template-columns: minmax(300px, 0.78fr) minmax(540px, 1.45fr) minmax(280px, 0.78fr) minmax(280px, 0.82fr);
-  grid-template-areas: "meta board list intake";
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "intake intake"
+    "list list"
+    "board board"
+    "meta notes";
   gap: 18px;
-  align-items: stretch;
+  align-items: start;
 }
 
-.games-left-rail,
-.position-secondary {
-  display: grid;
-  grid-template-rows: minmax(260px, auto) minmax(0, 1fr);
-  gap: 18px;
-  min-height: 0;
-}
-
-.games-left-rail,
+.position-secondary,
 .game-replay-panel,
 .game-list-panel,
-.game-import-panel {
-  height: 100%;
+.game-import-panel,
+.game-meta-panel,
+.annotation-panel {
   min-height: 0;
 }
 
@@ -1735,20 +1732,30 @@ select:focus {
   max-width: 72ch;
 }
 
-.games-left-rail {
-  grid-area: meta;
-}
-
 .game-replay-panel {
   grid-area: board;
 }
 
 .game-list-panel {
   grid-area: list;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 260px;
+  max-height: 340px;
 }
 
 .game-import-panel {
   grid-area: intake;
+  grid-template-rows: auto 1fr;
+}
+
+.game-meta-panel {
+  grid-area: meta;
+  grid-template-rows: auto 1fr;
+}
+
+.annotation-panel {
+  grid-area: notes;
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 .side-panel-heading {
@@ -1763,16 +1770,6 @@ select:focus {
   justify-content: flex-start;
 }
 
-.game-meta-panel,
-.game-list-panel,
-.game-import-panel {
-  grid-template-rows: auto 1fr;
-}
-
-.annotation-panel {
-  grid-template-rows: auto auto 1fr;
-}
-
 .game-meta-body,
 .annotation-scroll,
 .game-import-body {
@@ -1783,6 +1780,11 @@ select:focus {
 .game-import-body {
   display: grid;
   gap: 14px;
+}
+
+.game-meta-panel,
+.annotation-panel {
+  min-height: 420px;
 }
 
 .annotation-scroll {
@@ -1807,8 +1809,13 @@ select:focus {
   height: 100%;
 }
 
+.game-import-body {
+  grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
+  align-items: start;
+}
+
 .game-pgn-field textarea {
-  min-height: 420px;
+  min-height: 220px;
 }
 
 .game-meta-grid {
@@ -1979,10 +1986,12 @@ select:focus {
   }
 
   .games-workspace {
-    grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.35fr) minmax(280px, 0.85fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-areas:
-      "board board list"
-      "meta meta intake";
+      "intake intake"
+      "list list"
+      "board board"
+      "meta notes";
   }
 }
 
@@ -2006,19 +2015,26 @@ select:focus {
   }
 
   .games-workspace {
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+    grid-template-columns: 1fr;
     grid-template-areas:
-      "board board"
-      "list intake"
-      "meta meta";
+      "intake"
+      "list"
+      "board"
+      "meta"
+      "notes";
   }
 
+  .game-import-body,
   .game-replay-layout {
     grid-template-columns: 1fr;
   }
 
   .game-replay-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .game-list-panel {
+    max-height: none;
   }
 }
 
@@ -2053,16 +2069,7 @@ select:focus {
   }
 
   .games-workspace {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "board"
-      "list"
-      "intake"
-      "meta";
-  }
-
-  .games-left-rail {
-    grid-template-rows: auto auto;
+    gap: 16px;
   }
 }
 
