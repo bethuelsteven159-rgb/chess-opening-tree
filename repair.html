@@ -12,9 +12,9 @@
   <script>
     document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
   </script>
-  <link rel="stylesheet" href="styles.css?v=12" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <link rel="stylesheet" href="styles.css?v=13" />
+  <script src="vendor/supabase-js.min.js"></script>
+  <script src="vendor/chess.min.js"></script>
 </head>
 <body class="app-page" data-page="repair">
   <div class="texture-grid"></div>
@@ -189,7 +189,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
-  <script type="module" src="./js/app.js?v=12"></script>
+  <script type="module" src="./js/app.js?v=13"></script>
   <script>
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
   </script>

@@ -21,8 +21,8 @@ function getRedirectUrl() {
 }
 
 async function redirectIfAlreadySignedIn() {
-  const { data, error } = await supabase.auth.getUser();
-  if (!error && data.user) {
+  const { data, error } = await supabase.auth.getSession();
+  if (!error && data.session?.user) {
     window.location.href = "./index.html";
   }
 }

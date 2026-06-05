@@ -12,7 +12,8 @@
   <script>
     document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
   </script>
-  <link rel="stylesheet" href="styles.css?v=12" />
+  <link rel="stylesheet" href="styles.css?v=13" />
+  <script src="vendor/supabase-js.min.js"></script>
 </head>
 <body class="auth-page">
   <div class="texture-grid"></div>
@@ -41,7 +42,7 @@
           <p class="eyebrow">Private study system</p>
           <h2>Turn your opening prep into a repeatable study loop.</h2>
           <p>
-            The board-first trainer drills recall from positions, preferred moves lock in your repertoire choices,
+            The sequential board trainer drills recall from positions, preferred moves lock in your repertoire choices,
             and the repair journal converts every painful loss into a concrete fix.
           </p>
 
@@ -75,6 +76,6 @@
     </section>
   </main>
 
-  <script type="module" src="./js/auth/login.js?v=12"></script>
+  <script type="module" src="./js/auth/login.js?v=13"></script>
 </body>
 </html>

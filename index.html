@@ -12,9 +12,9 @@
   <script>
     document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
   </script>
-  <link rel="stylesheet" href="styles.css?v=12" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <link rel="stylesheet" href="styles.css?v=13" />
+  <script src="vendor/supabase-js.min.js"></script>
+  <script src="vendor/chess.min.js"></script>
 </head>
 <body class="app-page" data-page="dashboard">
   <div class="texture-grid"></div>
@@ -50,8 +50,8 @@
         <p class="eyebrow">What to do</p>
         <h2>Pick the study lane that matches the work in front of you.</h2>
         <p>
-          Keep the workspace modular: build moves in the editor, drill answers in training mode,
-          review one random card at a time, and convert real-game pain into focused repair loops.
+          Keep the workspace modular: build moves in the editor, drill full branches in training mode,
+          and convert real-game pain into focused repair loops.
         </p>
       </div>
 
@@ -93,16 +93,6 @@
       </div>
 
       <div class="dashboard-grid">
-        <a class="study-choice-card" href="random.html">
-          <span class="study-choice-kicker">Random cards</span>
-          <h4>Quick review deck</h4>
-          <p>Shuffle one board and one lesson at a time when you want light, fast recall.</p>
-          <div class="study-choice-meta">
-            <strong id="dashboardRandomCount">0 ready</strong>
-            <span>Weighted toward preferred moves</span>
-          </div>
-        </a>
-
         <a class="study-choice-card" href="editor.html">
           <span class="study-choice-kicker">Move editor</span>
           <h4>Build lines with the live board</h4>
@@ -115,11 +105,11 @@
 
         <a class="study-choice-card" href="training.html">
           <span class="study-choice-kicker">Training mode</span>
-          <h4>Board-first prompt trainer</h4>
-          <p>Train openings, middlegames, or endgames from positions. Preferred moves count as correct answers.</p>
+          <h4>Sequential board trainer</h4>
+          <p>Choose the root, hear the opponent reply, and keep naming your move until the stored line runs out.</p>
           <div class="study-choice-meta">
             <strong id="dashboardTrainerCount">0 prompts</strong>
-            <span>Only skipped when marked do not train</span>
+            <span>Reveal the answer or jump to the next line</span>
           </div>
         </a>
 
@@ -161,12 +151,12 @@
   </main>
 
   <footer class="page-shell page-footer">
-    <p>Pick the page that matches the work: build, train, review, or repair.</p>
+    <p>Pick the page that matches the work: build, train, or repair.</p>
   </footer>
 
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
-  <script type="module" src="./js/app.js?v=12"></script>
+  <script type="module" src="./js/app.js?v=13"></script>
   <script>
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
   </script>

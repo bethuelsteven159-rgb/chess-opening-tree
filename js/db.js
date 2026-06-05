@@ -195,6 +195,14 @@ function loadPendingRepairs() {
   return readStoredArray(PENDING_REPAIR_SYNC_KEY, normalizeRepairItem);
 }
 
+function hasPendingNodes() {
+  return hasLocalJson(PENDING_NODE_SYNC_KEY);
+}
+
+function hasPendingRepairs() {
+  return hasLocalJson(PENDING_REPAIR_SYNC_KEY);
+}
+
 function markPendingNodes(nodes) {
   writeLocalJson(PENDING_NODE_SYNC_KEY, nodes);
 }
@@ -255,6 +263,18 @@ function loadLocalRepairs() {
 
 function describeError(error) {
   return `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`.toLowerCase();
+}
+
+function isConnectivityError(error) {
+  const text = describeError(error);
+  return (
+    error?.name === "TypeError" ||
+    text.includes("failed to fetch") ||
+    text.includes("fetch failed") ||
+    text.includes("network") ||
+    text.includes("offline") ||
+    text.includes("load failed")
+  );
 }
 
 function isMissingColumnError(error, columnName) {
@@ -429,11 +449,12 @@ async function loadRepairItemsFromRemote(client, table) {
   return (data || []).map(normalizeRepairItem);
 }
 
-async function syncNodesToRemote(client, table, clean) {
+async function syncNodesToRemote(client, table, clean, options = {}) {
+  const { allowEmpty = false } = options;
   const support = await openingNodeSupport(client, table);
   const remoteNodes = await loadNodesFromRemote(client, table);
 
-  if (!clean.length && remoteNodes.length) {
+  if (!allowEmpty && !clean.length && remoteNodes.length) {
     throw new Error("Refusing to replace a non-empty opening tree with an empty save payload.");
   }
 
@@ -462,10 +483,11 @@ async function syncNodesToRemote(client, table, clean) {
   }
 }
 
-async function syncRepairItemsToRemote(client, table, clean) {
+async function syncRepairItemsToRemote(client, table, clean, options = {}) {
+  const { allowEmpty = false } = options;
   const remoteItems = await loadRepairItemsFromRemote(client, table);
 
-  if (!clean.length && remoteItems.length) {
+  if (!allowEmpty && !clean.length && remoteItems.length) {
     throw new Error("Refusing to replace a non-empty repair list with an empty save payload.");
   }
 
@@ -498,11 +520,12 @@ async function syncRepairItemsToRemote(client, table, clean) {
 async function loadNodes() {
   const localNodes = loadLocalNodes();
   const pendingNodes = loadPendingNodes();
+  const pendingNodesExist = hasPendingNodes();
   const client = getClient();
   const table = window.APP_CONFIG?.TABLE_NAME || "opening_nodes";
 
   if (!client) {
-    if (pendingNodes.length) {
+    if (pendingNodesExist) {
       storeCurrentNodes(pendingNodes);
       return pendingNodes;
     }
@@ -510,9 +533,24 @@ async function loadNodes() {
     return localNodes;
   }
 
-  const remoteNodes = await loadNodesFromRemote(client, table);
+  let remoteNodes;
+  try {
+    remoteNodes = await loadNodesFromRemote(client, table);
+  } catch (error) {
+    if (isConnectivityError(error)) {
+      console.warn("Opening tree remote load is unavailable. Using the local copy instead.", error);
+      if (pendingNodesExist) {
+        storeCurrentNodes(pendingNodes);
+        return pendingNodes;
+      }
 
-  if (pendingNodes.length && !rowsMatchExactly(remoteNodes, pendingNodes)) {
+      return localNodes;
+    }
+
+    throw error;
+  }
+
+  if (pendingNodesExist && !rowsMatchExactly(remoteNodes, pendingNodes)) {
     console.warn("Remote opening tree does not match the pending local sync. Preserving the local recovery copy instead of overwriting it.");
     storeCurrentNodes(pendingNodes);
     return pendingNodes;
@@ -528,12 +566,13 @@ async function loadNodes() {
   return remoteNodes;
 }
 
-async function saveAllNodes(nodes) {
+async function saveAllNodes(nodes, options = {}) {
+  const { allowEmpty = false } = options;
   const clean = nodes.map(normalizeNode);
   const client = getClient();
   const table = window.APP_CONFIG?.TABLE_NAME || "opening_nodes";
 
-  if (!clean.length) {
+  if (!allowEmpty && !clean.length) {
     if (client) {
       const remoteNodes = await loadNodesFromRemote(client, table);
       if (remoteNodes.length) {
@@ -548,13 +587,22 @@ async function saveAllNodes(nodes) {
   markPendingNodes(clean);
 
   if (!client) {
-    clearPendingNodes();
     return clean;
   }
 
-  await syncNodesToRemote(client, table, clean);
-  storeCurrentNodes(clean);
-  clearPendingNodes();
+  try {
+    await syncNodesToRemote(client, table, clean, { allowEmpty });
+    storeCurrentNodes(clean);
+    clearPendingNodes();
+  } catch (error) {
+    if (isConnectivityError(error)) {
+      console.warn("Opening tree sync is unavailable. Keeping the latest save locally until the next sync.", error);
+      return clean;
+    }
+
+    throw error;
+  }
+
   return clean;
 }
 
@@ -581,19 +629,7 @@ async function deleteNodeAndChildren(id) {
   const removeIds = new Set([id, ...childrenOf(id)]);
   const kept = nodes.filter(node => !removeIds.has(node.id));
 
-  const client = getClient();
-  const table = window.APP_CONFIG?.TABLE_NAME || "opening_nodes";
-
-  if (client) {
-    const { error } = await client.from(table).delete().eq("id", id);
-    if (error) {
-      console.error("Supabase subtree delete failed:", error);
-      throw error;
-    }
-  }
-
-  storeCurrentNodes(kept);
-  clearPendingNodes();
+  await saveAllNodes(kept, { allowEmpty: true });
 
   const repairs = await loadRepairItems();
   const filteredRepairs = repairs.map(repair =>
@@ -602,18 +638,38 @@ async function deleteNodeAndChildren(id) {
       : repair
   );
 
-  await saveAllRepairItems(filteredRepairs);
+  await saveAllRepairItems(filteredRepairs, { allowEmpty: true });
   return kept;
 }
 
 async function loadRepairItems() {
   const localRepairs = loadLocalRepairs();
   const pendingRepairs = loadPendingRepairs();
+  const pendingRepairsExist = hasPendingRepairs();
   const client = getClient();
   const table = window.APP_CONFIG?.REPAIR_TABLE_NAME || "repair_items";
+  let repairReady = false;
 
-  if (!client || !(await repairTableAvailable(client, table))) {
-    if (pendingRepairs.length) {
+  if (client) {
+    try {
+      repairReady = await repairTableAvailable(client, table);
+    } catch (error) {
+      if (isConnectivityError(error)) {
+        console.warn("Repair table check is unavailable. Using the local copy instead.", error);
+        if (pendingRepairsExist) {
+          storeCurrentRepairs(pendingRepairs);
+          return pendingRepairs;
+        }
+
+        return localRepairs;
+      }
+
+      throw error;
+    }
+  }
+
+  if (!client || !repairReady) {
+    if (pendingRepairsExist) {
       storeCurrentRepairs(pendingRepairs);
       return pendingRepairs;
     }
@@ -621,9 +677,24 @@ async function loadRepairItems() {
     return localRepairs;
   }
 
-  const remoteItems = await loadRepairItemsFromRemote(client, table);
+  let remoteItems;
+  try {
+    remoteItems = await loadRepairItemsFromRemote(client, table);
+  } catch (error) {
+    if (isConnectivityError(error)) {
+      console.warn("Repair remote load is unavailable. Using the local copy instead.", error);
+      if (pendingRepairsExist) {
+        storeCurrentRepairs(pendingRepairs);
+        return pendingRepairs;
+      }
 
-  if (pendingRepairs.length && !rowsMatchExactly(remoteItems, pendingRepairs)) {
+      return localRepairs;
+    }
+
+    throw error;
+  }
+
+  if (pendingRepairsExist && !rowsMatchExactly(remoteItems, pendingRepairs)) {
     console.warn("Remote repair list does not match the pending local sync. Preserving the local recovery copy instead of overwriting it.");
     storeCurrentRepairs(pendingRepairs);
     return pendingRepairs;
@@ -639,13 +710,19 @@ async function loadRepairItems() {
   return remoteItems;
 }
 
-async function saveAllRepairItems(items) {
+async function saveAllRepairItems(items, options = {}) {
+  const { allowEmpty = false } = options;
   const clean = items.map(normalizeRepairItem);
   const client = getClient();
   const table = window.APP_CONFIG?.REPAIR_TABLE_NAME || "repair_items";
+  let repairReady = false;
 
-  if (!clean.length) {
-    if (client && await repairTableAvailable(client, table)) {
+  if (!allowEmpty && !clean.length) {
+    if (client) {
+      repairReady = await repairTableAvailable(client, table);
+    }
+
+    if (client && repairReady) {
       const remoteItems = await loadRepairItemsFromRemote(client, table);
       if (remoteItems.length) {
         throw new Error("Refusing to replace a non-empty repair list with an empty bulk save.");
@@ -658,14 +735,36 @@ async function saveAllRepairItems(items) {
   storeCurrentRepairs(clean);
   markPendingRepairs(clean);
 
-  if (!client || !(await repairTableAvailable(client, table))) {
-    clearPendingRepairs();
+  if (client && !repairReady) {
+    try {
+      repairReady = await repairTableAvailable(client, table);
+    } catch (error) {
+      if (isConnectivityError(error)) {
+        console.warn("Repair table check is unavailable. Keeping the latest repair save locally until the next sync.", error);
+        return clean;
+      }
+
+      throw error;
+    }
+  }
+
+  if (!client || !repairReady) {
     return clean;
   }
 
-  await syncRepairItemsToRemote(client, table, clean);
-  storeCurrentRepairs(clean);
-  clearPendingRepairs();
+  try {
+    await syncRepairItemsToRemote(client, table, clean, { allowEmpty });
+    storeCurrentRepairs(clean);
+    clearPendingRepairs();
+  } catch (error) {
+    if (isConnectivityError(error)) {
+      console.warn("Repair sync is unavailable. Keeping the latest repair save locally until the next sync.", error);
+      return clean;
+    }
+
+    throw error;
+  }
+
   return clean;
 }
 
@@ -684,19 +783,7 @@ async function upsertRepairItem(item) {
 async function deleteRepairItem(id) {
   const repairs = await loadRepairItems();
   const kept = repairs.filter(entry => entry.id !== id);
-  const client = getClient();
-  const table = window.APP_CONFIG?.REPAIR_TABLE_NAME || "repair_items";
-
-  if (client && await repairTableAvailable(client, table)) {
-    const { error } = await client.from(table).delete().eq("id", id);
-    if (error) {
-      console.error("Supabase repair delete failed:", error);
-      throw error;
-    }
-  }
-
-  storeCurrentRepairs(kept);
-  clearPendingRepairs();
+  await saveAllRepairItems(kept, { allowEmpty: true });
   return kept;
 }
 

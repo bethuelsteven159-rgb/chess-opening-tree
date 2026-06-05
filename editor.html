@@ -12,9 +12,9 @@
   <script>
     document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
   </script>
-  <link rel="stylesheet" href="styles.css?v=12" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <link rel="stylesheet" href="styles.css?v=13" />
+  <script src="vendor/supabase-js.min.js"></script>
+  <script src="vendor/chess.min.js"></script>
 </head>
 <body class="app-page" data-page="editor">
   <div class="texture-grid"></div>
@@ -39,8 +39,8 @@
       </div>
 
       <div class="nav-actions">
-        <button id="importBtn" class="button button-ghost button-tiny" type="button">Import JSON</button>
-        <button id="exportBtn" class="button button-ghost button-tiny" type="button">Export JSON</button>
+        <button id="importBtn" class="button button-ghost button-tiny" type="button">Import backup</button>
+        <button id="exportBtn" class="button button-ghost button-tiny" type="button">Export tables</button>
         <button id="splitCompoundBtn" class="button button-ghost button-tiny" type="button">Split Moves</button>
         <button id="themeToggleBtn" class="button button-secondary button-tiny" type="button">Light mode</button>
         <button id="syncBtn" class="button button-primary button-tiny" type="button">Sync</button>
@@ -188,7 +188,7 @@
             <input id="excludeTrainingInput" type="checkbox" />
             <span>
               Do not use for training
-              <small>Keep the move in the tree, but remove it from training mode and random review answer pools.</small>
+              <small>Keep the move in the tree, but remove it from training mode and the next-line review queue.</small>
             </span>
           </label>
         </div>
@@ -208,7 +208,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
-  <script type="module" src="./js/app.js?v=12"></script>
+  <script type="module" src="./js/app.js?v=13"></script>
   <script>
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
   </script>

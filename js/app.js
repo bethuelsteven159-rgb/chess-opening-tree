@@ -19,14 +19,23 @@ if (!window.OpeningDB) {
 }
 
 const SELECTED_NODE_STORAGE_KEY = "gm_opening_tree_selected_node_v1";
+const BACKUP_PROMPT_SESSION_KEY = "gm_opening_tree_backup_prompt_seen_v1";
 
 let nodes = [];
 let repairs = [];
 let selectedId = loadSelectedNodeId();
 let selectedRepairId = null;
-let trainerPrompt = null;
-let trainerResult = null;
-let trainerRevealOpen = false;
+let trainingState = {
+  color: "w",
+  rootId: null,
+  prompt: null,
+  result: null,
+  revealOpen: false,
+  whyOpen: false,
+  lastOpponentNodeId: null,
+  completedLines: 0,
+  solvedPrompts: 0
+};
 
 const $ = id => document.getElementById(id);
 
@@ -75,10 +84,45 @@ function reportActionError(actionLabel, error) {
   alert(`${actionLabel} failed.\n\n${formatActionError(error)}\n\nYour local recovery copy was kept so the app should not wipe your tree.`);
 }
 
+function ensureToastHost() {
+  let host = document.getElementById("toastHost");
+  if (host) return host;
+
+  host = document.createElement("div");
+  host.id = "toastHost";
+  host.className = "toast-host";
+  document.body.appendChild(host);
+  return host;
+}
+
+function showToast(message, kind = "success") {
+  const host = ensureToastHost();
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${kind}`;
+  toast.textContent = message;
+  host.appendChild(toast);
+
+  requestAnimationFrame(() => toast.classList.add("is-visible"));
+
+  window.setTimeout(() => {
+    toast.classList.remove("is-visible");
+    window.setTimeout(() => toast.remove(), 180);
+  }, 2400);
+}
+
 function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>'"]/g, char => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]
   ));
+}
+
+function downloadJsonFile(filename, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
 }
 
 function highlightLabel(kind) {
@@ -134,6 +178,10 @@ function pathNodesFor(node) {
 
 function pathFor(node) {
   return pathNodesFor(node).map(entry => entry.move).join("  ");
+}
+
+function rootNodeFor(node) {
+  return pathNodesFor(node)[0] || null;
 }
 
 function openRepairsForNode(nodeId) {
@@ -215,8 +263,7 @@ function selectNode(id, shouldPaint = true) {
 }
 
 function renderStats() {
-  const trainerPositions = buildTrainingPositions().length;
-  const eligibleCards = nodes.filter(isTrainingEnabled).length;
+  const trainerPositions = buildTrainingPromptGroups().length;
   const openRepairs = repairs.filter(repair => repair.status === "needs_work").length;
   const rootLines = nodes.filter(node => !node.parent_id).length;
 
@@ -225,7 +272,6 @@ function renderStats() {
   setText("trainerCount", String(trainerPositions));
   setText("repairCount", String(openRepairs));
 
-  setText("dashboardRandomCount", `${eligibleCards} ready`);
   setText("dashboardEditorCount", `${nodes.length} moves`);
   setText("dashboardTrainerCount", `${trainerPositions} prompts`);
   setText("dashboardRepairCount", `${openRepairs} open`);
@@ -505,171 +551,377 @@ async function splitCompoundMovesOnce() {
   alert(`Done. Split ${splitNodeCount} move cell(s) and created ${addedNodeCount} extra child node(s).`);
 }
 
-function buildTrainingPositions() {
-  const grouped = new Map();
+function nodeMoveColor(node) {
+  return rootTurnForMove(node?.move || "");
+}
+
+function oppositeColor(color) {
+  return color === "b" ? "w" : "b";
+}
+
+function preferredTrainingNodes(group) {
+  if (!group.length) return [];
+  return group.some(node => node.is_preferred) ? group.filter(node => node.is_preferred) : group;
+}
+
+function trainingRoots(color = trainingState.color) {
+  return nodes
+    .filter(node => !node.parent_id && isTrainingEnabled(node) && (!color || nodeMoveColor(node) === color))
+    .sort((a, b) => (a.title || a.move).localeCompare(b.title || b.move));
+}
+
+function trainingChildrenFor(parentId, { color = null, rootId = null, includeExcluded = false } = {}) {
+  return children(parentId)
+    .filter(node => includeExcluded || isTrainingEnabled(node))
+    .filter(node => !color || nodeMoveColor(node) === color)
+    .filter(node => !rootId || rootNodeFor(node)?.id === rootId);
+}
+
+function buildTrainingPromptGroups({ color = null, rootId = null } = {}) {
+  const groups = [];
+  const parentGroups = new Map();
 
   for (const node of nodes.filter(isTrainingEnabled)) {
-    const key = trainingGroupKeyForNode(node);
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key).push(node);
+    if (color && nodeMoveColor(node) !== color) continue;
+    if (rootId && rootNodeFor(node)?.id !== rootId) continue;
+
+    if (!node.parent_id) {
+      groups.push({
+        positionId: null,
+        positionNode: null,
+        positionNodes: [],
+        openingNode: node,
+        acceptedNodes: [node],
+        eligibleChildren: [node],
+        allChildren: trainingRoots(nodeMoveColor(node)),
+        excludedChildren: nodes.filter(
+          entry => !entry.parent_id && nodeMoveColor(entry) === nodeMoveColor(node) && !isTrainingEnabled(entry)
+        ),
+        pendingRepairs: openRepairsForNode(node.id),
+        lastOpponentNode: null
+      });
+      continue;
+    }
+
+    if (!parentGroups.has(node.parent_id)) parentGroups.set(node.parent_id, []);
+    parentGroups.get(node.parent_id).push(node);
   }
 
-  return [...grouped.entries()].map(([groupKey, group]) => {
-    const parentId = group[0]?.parent_id || null;
-    const acceptedNodes = group.some(node => node.is_preferred)
-      ? group.filter(node => node.is_preferred)
-      : group;
-    const positionNode = parentId ? nodeById(parentId) : null;
-    const positionNodes = positionNode ? pathNodesFor(positionNode) : [];
-    const startingTurn = parentId ? "w" : rootTurnForMove(group[0]?.move || "");
-    const allChildren = parentId
-      ? children(parentId)
-      : nodes.filter(node => !node.parent_id && rootTurnForMove(node.move) === startingTurn);
-    const pendingRepairs = repairs.filter(repair =>
-      repair.status === "needs_work" &&
-      acceptedNodes.some(node => node.id === repair.related_node_id)
-    );
+  for (const [parentId, group] of parentGroups.entries()) {
+    const positionNode = nodeById(parentId);
+    if (!positionNode) continue;
+    const moveColor = nodeMoveColor(group[0]);
+    const siblingNodes = children(parentId).filter(node => nodeMoveColor(node) === moveColor);
+    const acceptedNodes = preferredTrainingNodes(group);
 
-    return {
-      groupKey,
-      parentId,
-      startingTurn,
+    groups.push({
+      positionId: parentId,
+      positionNode,
+      positionNodes: pathNodesFor(positionNode),
+      openingNode: rootNodeFor(positionNode),
       acceptedNodes,
       eligibleChildren: group,
-      allChildren,
-      positionNodes,
-      pendingRepairs
-    };
-  });
-}
-
-function findTrainingPosition(groupKey, groups = buildTrainingPositions()) {
-  return groups.find(group => group.groupKey === groupKey) || null;
-}
-
-function focusTrainingGroupKeyFromSelection(groups = buildTrainingPositions()) {
-  const current = currentNode();
-  if (!current) return undefined;
-
-  if (findTrainingPosition(current.id, groups)) return current.id;
-
-  const currentGroupKey = trainingGroupKeyForNode(current);
-  if (findTrainingPosition(currentGroupKey, groups)) return currentGroupKey;
-
-  return undefined;
-}
-
-function pickWeightedPrompt(pool) {
-  if (!pool.length) return null;
-
-  const weighted = pool.map(group => {
-    const preferredWeight = group.acceptedNodes.some(node => node.is_preferred) ? 3 : 1;
-    const repairWeight = group.pendingRepairs.length * 4;
-    const clarityWeight = group.acceptedNodes.length === 1 ? 2 : 1;
-    return { group, weight: 1 + preferredWeight + repairWeight + clarityWeight };
-  });
-
-  const totalWeight = weighted.reduce((sum, entry) => sum + entry.weight, 0);
-  let roll = Math.random() * totalWeight;
-
-  for (const entry of weighted) {
-    roll -= entry.weight;
-    if (roll <= 0) return entry.group;
+      allChildren: siblingNodes,
+      excludedChildren: siblingNodes.filter(node => !isTrainingEnabled(node)),
+      pendingRepairs: repairs.filter(
+        repair => repair.status === "needs_work" && acceptedNodes.some(node => node.id === repair.related_node_id)
+      ),
+      lastOpponentNode: null
+    });
   }
 
-  return weighted[weighted.length - 1].group;
+  return groups;
 }
 
-function setTrainerPrompt(group) {
-  trainerPrompt = group;
-  trainerResult = null;
-  trainerRevealOpen = false;
+function selectedRootForTrainerColor(color = trainingState.color) {
+  const current = currentNode();
+  const root = current ? rootNodeFor(current) : null;
+  return root && isTrainingEnabled(root) && nodeMoveColor(root) === color ? root : null;
+}
+
+function resolveTrainingRootId(color = trainingState.color, desiredId = trainingState.rootId) {
+  const roots = trainingRoots(color);
+  if (!roots.length) return null;
+  if (desiredId && roots.some(root => root.id === desiredId)) return desiredId;
+
+  const focusedRoot = selectedRootForTrainerColor(color);
+  if (focusedRoot) return focusedRoot.id;
+
+  return roots[0].id;
+}
+
+function trainingBranchWeight(node, trainingColor = trainingState.color) {
+  const descendants = trainingChildrenFor(node.id).length;
+  const promptBias = nodeMoveColor(node) === trainingColor ? 2 : 1;
+  return 1 + promptBias + (node.is_preferred ? 3 : 0) + openRepairsForNode(node.id).length * 4 + descendants;
+}
+
+function pickWeightedNode(pool, weightFn = entry => trainingBranchWeight(entry)) {
+  if (!pool.length) return null;
+
+  const weighted = pool.map(entry => ({
+    entry,
+    weight: Math.max(1, Number(weightFn(entry)) || 1)
+  }));
+  const totalWeight = weighted.reduce((sum, item) => sum + item.weight, 0);
+  let roll = Math.random() * totalWeight;
+
+  for (const item of weighted) {
+    roll -= item.weight;
+    if (roll <= 0) return item.entry;
+  }
+
+  return weighted[weighted.length - 1].entry;
+}
+
+function resetTrainerState({ keepSelections = true } = {}) {
+  trainingState = {
+    color: trainingState.color,
+    rootId: keepSelections ? trainingState.rootId : null,
+    prompt: null,
+    result: null,
+    revealOpen: false,
+    whyOpen: false,
+    lastOpponentNodeId: null,
+    completedLines: keepSelections ? trainingState.completedLines : 0,
+    solvedPrompts: keepSelections ? trainingState.solvedPrompts : 0
+  };
+
   const input = $("trainerAnswerInput");
   if (input) input.value = "";
 }
 
-function queueTrainerPrompt({ focusSelection = false } = {}) {
-  const groups = buildTrainingPositions();
-  if (!groups.length) {
-    setTrainerPrompt(null);
-    paint();
-    return;
-  }
+function setTrainingPrompt(prompt) {
+  trainingState.prompt = prompt;
+  trainingState.result = null;
+  trainingState.revealOpen = false;
+  trainingState.whyOpen = false;
 
-  let pool = groups;
-  if (focusSelection) {
-    const focusGroupKey = focusTrainingGroupKeyFromSelection(groups);
-    if (focusGroupKey !== undefined && findTrainingPosition(focusGroupKey, groups)) {
-      pool = groups.filter(group => group.groupKey === focusGroupKey);
-    }
-  }
-
-  setTrainerPrompt(pickWeightedPrompt(pool));
-  paint();
+  const input = $("trainerAnswerInput");
+  if (input) input.value = "";
 }
 
-function synchronizeTrainerPrompt() {
-  const groups = buildTrainingPositions();
+function buildRootTrainingPrompt(rootNode) {
+  if (!rootNode) return null;
 
-  if (!groups.length) {
-    trainerPrompt = null;
-    trainerResult = null;
-    trainerRevealOpen = false;
+  return {
+    positionId: null,
+    positionNode: null,
+    positionNodes: [],
+    openingNode: rootNode,
+    acceptedNodes: [rootNode],
+    eligibleChildren: [rootNode],
+    allChildren: trainingRoots(trainingState.color),
+    excludedChildren: nodes.filter(
+      node => !node.parent_id && nodeMoveColor(node) === trainingState.color && !isTrainingEnabled(node)
+    ),
+    pendingRepairs: openRepairsForNode(rootNode.id),
+    lastOpponentNode: null
+  };
+}
+
+function buildPositionTrainingPrompt(positionNode) {
+  if (!positionNode) return null;
+
+  const moveColor = trainingState.color;
+  const allChildren = trainingChildrenFor(positionNode.id, {
+    color: moveColor,
+    rootId: trainingState.rootId,
+    includeExcluded: true
+  });
+  const eligibleChildren = allChildren.filter(isTrainingEnabled);
+  if (!eligibleChildren.length) return null;
+
+  const acceptedNodes = preferredTrainingNodes(eligibleChildren);
+  const lastOpponentNode = trainingState.lastOpponentNodeId ? nodeById(trainingState.lastOpponentNodeId) : null;
+
+  return {
+    positionId: positionNode.id,
+    positionNode,
+    positionNodes: pathNodesFor(positionNode),
+    openingNode: rootNodeFor(positionNode),
+    acceptedNodes,
+    eligibleChildren,
+    allChildren,
+    excludedChildren: allChildren.filter(node => !isTrainingEnabled(node)),
+    pendingRepairs: repairs.filter(
+      repair => repair.status === "needs_work" && acceptedNodes.some(node => node.id === repair.related_node_id)
+    ),
+    lastOpponentNode
+  };
+}
+
+function beginTrainingLine() {
+  trainingState.rootId = resolveTrainingRootId(trainingState.color, trainingState.rootId);
+
+  if (!trainingState.rootId) {
+    resetTrainerState({ keepSelections: true });
+    paintTrainer();
     return;
   }
 
-  if (!trainerPrompt) {
-    trainerPrompt = pickWeightedPrompt(groups);
+  trainingState.lastOpponentNodeId = null;
+  setTrainingPrompt(buildRootTrainingPrompt(nodeById(trainingState.rootId)));
+  paintTrainer();
+}
+
+function switchTrainingColor(color) {
+  if (!["w", "b"].includes(color)) return;
+
+  trainingState.color = color;
+  trainingState.rootId = resolveTrainingRootId(color, null);
+  trainingState.prompt = null;
+  trainingState.result = null;
+  trainingState.revealOpen = false;
+  trainingState.whyOpen = false;
+  trainingState.lastOpponentNodeId = null;
+
+  const input = $("trainerAnswerInput");
+  if (input) input.value = "";
+
+  paintTrainer();
+}
+
+function completeTrainingLine(finalNode, message) {
+  trainingState.prompt = null;
+  trainingState.revealOpen = false;
+  trainingState.whyOpen = false;
+  trainingState.lastOpponentNodeId = null;
+  trainingState.completedLines += 1;
+  trainingState.result = {
+    kind: "line-complete",
+    node: finalNode,
+    message
+  };
+
+  const input = $("trainerAnswerInput");
+  if (input) input.value = "";
+}
+
+function continueTrainingLine(chosenNode) {
+  if (!chosenNode) return;
+
+  if (trainingState.result?.kind === "correct") {
+    trainingState.solvedPrompts += 1;
+  }
+
+  const opponentOptions = trainingChildrenFor(chosenNode.id, {
+    color: oppositeColor(trainingState.color),
+    rootId: trainingState.rootId
+  });
+
+  if (!opponentOptions.length) {
+    completeTrainingLine(chosenNode, `Line complete. No stored opponent reply follows ${chosenNode.move}.`);
+    paintTrainer();
     return;
   }
 
-  trainerPrompt = findTrainingPosition(trainerPrompt.groupKey, groups) || pickWeightedPrompt(groups);
+  const opponentNode = pickWeightedNode(opponentOptions);
+  trainingState.lastOpponentNodeId = opponentNode.id;
+
+  const nextPrompt = buildPositionTrainingPrompt(opponentNode);
+  if (!nextPrompt) {
+    completeTrainingLine(opponentNode, `Line complete after ${opponentNode.move}.`);
+    paintTrainer();
+    return;
+  }
+
+  setTrainingPrompt(nextPrompt);
+  paintTrainer();
+}
+
+function synchronizeTrainingState() {
+  trainingState.rootId = resolveTrainingRootId(trainingState.color, trainingState.rootId);
+
+  if (trainingState.lastOpponentNodeId && !nodeById(trainingState.lastOpponentNodeId)) {
+    trainingState.lastOpponentNodeId = null;
+  }
+
+  if (!trainingState.rootId) {
+    trainingState.prompt = null;
+    trainingState.result = null;
+    trainingState.revealOpen = false;
+    trainingState.whyOpen = false;
+    return;
+  }
+
+  if (!trainingState.prompt) return;
+
+  if (trainingState.prompt.positionId === null) {
+    trainingState.prompt = buildRootTrainingPrompt(nodeById(trainingState.rootId));
+    return;
+  }
+
+  const positionNode = nodeById(trainingState.prompt.positionId);
+  if (!positionNode || rootNodeFor(positionNode)?.id !== trainingState.rootId) {
+    setTrainingPrompt(buildRootTrainingPrompt(nodeById(trainingState.rootId)));
+    return;
+  }
+
+  const rebuiltPrompt = buildPositionTrainingPrompt(positionNode);
+  if (!rebuiltPrompt) {
+    completeTrainingLine(positionNode, `This stored line now ends after ${positionNode.move}.`);
+    return;
+  }
+
+  trainingState.prompt = rebuiltPrompt;
 }
 
 function trainerAcceptedMovesText(prompt) {
   return prompt.acceptedNodes.map(node => node.move).join(", ");
 }
 
-function trainerAnswerTitle(prompt) {
-  if (!prompt) return "Waiting for a prompt";
-  return prompt.positionNodes.length
-    ? `Position after ${prompt.positionNodes[prompt.positionNodes.length - 1].move}`
-    : "Starting position";
+function trainerAnswerTitle(prompt, result = trainingState.result) {
+  if (prompt) {
+    return prompt.positionNodes.length
+      ? `Position after ${prompt.positionNodes[prompt.positionNodes.length - 1].move}`
+      : "Start position";
+  }
+
+  if (result?.kind === "line-complete" && result.node) {
+    return `Line complete after ${result.node.move}`;
+  }
+
+  return "Trainer waiting";
 }
 
 function renderTrainerFeedback(prompt) {
-  if (!prompt) {
-    return `<div class="feedback-box feedback-neutral">Mark a few moves for training and the prompt queue will appear here.</div>`;
+  if (!trainingState.rootId) {
+    return `<div class="feedback-box feedback-neutral">Choose a color and a study root, then start a training line.</div>`;
   }
 
-  if (!trainerResult) {
-    return `<div class="feedback-box feedback-neutral">What is the next move? Type SAN like <code>Bc4</code>, <code>Nf3</code>, or <code>...Bb6</code>.</div>`;
+  if (trainingState.result?.kind === "line-complete") {
+    return `<div class="feedback-box feedback-correct">&#10003; ${escapeHtml(trainingState.result.message || "Line complete.")}</div>`;
+  }
+
+  if (!prompt) {
+    return `<div class="feedback-box feedback-neutral">Start a line to see the next position prompt.</div>`;
+  }
+
+  if (!trainingState.result) {
+    return `<div class="feedback-box feedback-neutral">Enter your move in SAN, then decide whether to reveal the idea or continue the line.</div>`;
   }
 
   const acceptedMoves = trainerAcceptedMovesText(prompt);
 
-  if (trainerResult.kind === "correct") {
-    const extra = prompt.acceptedNodes.length > 1
-      ? ` ${escapeHtml(trainerResult.node.move)} is one of your accepted repertoire choices here.`
+  if (trainingState.result.kind === "correct") {
+    const branchText = prompt.acceptedNodes.length > 1
+      ? ` ${escapeHtml(trainingState.result.node.move)} is one of your accepted repertoire choices here.`
       : "";
-    return `<div class="feedback-box feedback-correct">&#10003; Correct.${extra}</div>`;
+    return `<div class="feedback-box feedback-correct">&#10003; Correct.${branchText}</div>`;
   }
 
-  if (trainerResult.kind === "excluded-branch") {
+  if (trainingState.result.kind === "excluded-branch") {
     return `
       <div class="feedback-box feedback-incorrect">
-        &#10007; ${escapeHtml(trainerResult.node.move)} exists in your tree, but it is marked <strong>do not use for training</strong>. The prompt expected <strong>${escapeHtml(acceptedMoves)}</strong>.
+        &#10007; ${escapeHtml(trainingState.result.node.move)} exists in your tree, but it is marked <strong>do not use for training</strong>. The prompt expected <strong>${escapeHtml(acceptedMoves)}</strong>.
       </div>`;
   }
 
-  if (trainerResult.kind === "tree-branch") {
-    const preferredLanguage = prompt.acceptedNodes.some(node => node.is_preferred)
-      ? "but your preferred repertoire move here is"
-      : "but this prompt was training";
-
+  if (trainingState.result.kind === "tree-branch") {
     return `
       <div class="feedback-box feedback-incorrect">
-        &#10007; ${escapeHtml(trainerResult.node.move)} exists in your tree, ${preferredLanguage} <strong>${escapeHtml(acceptedMoves)}</strong>.
+        &#10007; ${escapeHtml(trainingState.result.node.move)} exists in your tree, but this session is training <strong>${escapeHtml(acceptedMoves)}</strong>.
       </div>`;
   }
 
@@ -679,23 +931,51 @@ function renderTrainerFeedback(prompt) {
     </div>`;
 }
 
-function renderTrainerReveal(prompt) {
-  if (!prompt || !trainerRevealOpen) return "";
+function renderTrainerDetails(prompt) {
+  if (!prompt) return "";
 
-  const answerCards = prompt.acceptedNodes.map(node => `
-    <article class="answer-card">
-      <div class="answer-card-top">
-        <strong>${escapeHtml(node.move)}</strong>
-        ${preferredBadgeHtml(node.is_preferred)}
-        ${highlightBadgeHtml(node.highlight_kind || "")}
+  const sections = [];
+
+  if (trainingState.whyOpen) {
+    const whyNode = prompt.lastOpponentNode || prompt.openingNode;
+    const whyLabel = prompt.lastOpponentNode ? `Why ${whyNode.move}?` : `Why start with ${whyNode.move}?`;
+
+    sections.push(`
+      <article class="answer-card">
+        <div class="answer-card-top">
+          <strong>${escapeHtml(whyLabel)}</strong>
+          ${highlightBadgeHtml(whyNode?.highlight_kind || "")}
+        </div>
+        <p class="answer-card-title">${escapeHtml(whyNode?.title || "No title yet")}</p>
+        <p>${escapeHtml(whyNode?.explanation || "No explanation yet. Add one in the editor so the trainer can explain the plan here.")}</p>
+      </article>
+    `);
+  }
+
+  if (trainingState.revealOpen) {
+    const answerCards = prompt.acceptedNodes.map(node => `
+      <article class="answer-card">
+        <div class="answer-card-top">
+          <strong>${escapeHtml(node.move)}</strong>
+          ${preferredBadgeHtml(node.is_preferred)}
+          ${highlightBadgeHtml(node.highlight_kind || "")}
+        </div>
+        <p class="answer-card-title">${escapeHtml(node.title || "Repertoire move")}</p>
+        <p>${escapeHtml(node.explanation || "No explanation yet. Add one in the editor so future-you gets the lesson immediately.")}</p>
+      </article>
+    `).join("");
+
+    sections.push(`
+      <div class="answer-key-row">
+        <span>Accepted move${prompt.acceptedNodes.length === 1 ? "" : "s"}</span>
+        <strong>${escapeHtml(trainerAcceptedMovesText(prompt))}</strong>
       </div>
-      <p class="answer-card-title">${escapeHtml(node.title || "Repertoire move")}</p>
-      <p>${escapeHtml(node.explanation || "No explanation yet. Add one in the editor so future-you gets the lesson immediately.")}</p>
-    </article>
-  `).join("");
+      <div class="answer-card-grid">${answerCards}</div>
+    `);
+  }
 
-  const repairCards = prompt.pendingRepairs.length
-    ? `
+  if (prompt.pendingRepairs.length && (trainingState.revealOpen || trainingState.whyOpen)) {
+    sections.push(`
       <div class="repair-hint-stack">
         <div class="line-label">Open repair notes</div>
         ${prompt.pendingRepairs.map(repair => `
@@ -705,93 +985,175 @@ function renderTrainerReveal(prompt) {
             <p><span>Repair.</span> ${escapeHtml(repair.repair || "No repair action captured yet.")}</p>
           </article>
         `).join("")}
-      </div>`
-    : "";
-
-  return `
-    <div class="answer-key">
-      <div class="answer-key-row">
-        <span>Accepted move${prompt.acceptedNodes.length === 1 ? "" : "s"}</span>
-        <strong>${escapeHtml(trainerAcceptedMovesText(prompt))}</strong>
       </div>
-      <div class="answer-card-grid">${answerCards}</div>
-      ${repairCards}
-    </div>`;
+    `);
+  }
+
+  return sections.length ? `<div class="answer-key">${sections.join("")}</div>` : "";
 }
 
 function paintTrainer() {
   const trainerBoardEl = $("trainerBoard");
   if (!trainerBoardEl) return;
 
-  const groups = buildTrainingPositions();
-  const focusPromptAvailable = findTrainingPosition(focusTrainingGroupKeyFromSelection(groups), groups);
-  const selectedPromptBtn = $("selectedPromptBtn");
-  const revealPromptBtn = $("revealPromptBtn");
+  synchronizeTrainingState();
+
+  const rootCount = trainingRoots(trainingState.color).length;
+  const promptCount = buildTrainingPromptGroups({
+    color: trainingState.color,
+    rootId: trainingState.rootId || undefined
+  }).length;
+  const prompt = trainingState.prompt;
+  const selectedRoot = trainingState.rootId ? nodeById(trainingState.rootId) : null;
+  const colorLabel = trainingState.color === "w" ? "White" : "Black";
+  const whiteBtn = $("trainerColorWhiteBtn");
+  const blackBtn = $("trainerColorBlackBtn");
+  const rootSelect = $("trainerRootSelect");
+  const startBtn = $("startTrainingBtn");
+  const continueBtn = $("continueTrainingBtn");
+  const nextBtn = $("nextTrainingBtn");
+  const revealBtn = $("revealPromptBtn");
+  const whyBtn = $("whyPromptBtn");
   const trainerSubmitBtn = $("trainerSubmitBtn");
   const trainerAnswerInput = $("trainerAnswerInput");
 
-  if (selectedPromptBtn) selectedPromptBtn.disabled = !focusPromptAvailable;
-  if (revealPromptBtn) revealPromptBtn.disabled = !trainerPrompt;
-  if (trainerSubmitBtn) trainerSubmitBtn.disabled = !trainerPrompt;
-  if (trainerAnswerInput) trainerAnswerInput.disabled = !trainerPrompt;
+  if (whiteBtn) whiteBtn.classList.toggle("is-active", trainingState.color === "w");
+  if (blackBtn) blackBtn.classList.toggle("is-active", trainingState.color === "b");
 
-  setText("trainerQueueCount", `${groups.length} training position${groups.length === 1 ? "" : "s"} ready`);
+  if (rootSelect) {
+    const roots = trainingRoots(trainingState.color);
+    rootSelect.disabled = !roots.length;
+    rootSelect.innerHTML = roots.length
+      ? roots.map(root => `
+          <option value="${root.id}" ${root.id === trainingState.rootId ? "selected" : ""}>
+            ${escapeHtml(root.title || root.move)} (${escapeHtml(root.move)})
+          </option>
+        `).join("")
+      : `<option value="">No ${colorLabel.toLowerCase()} roots ready yet</option>`;
+  }
 
-  const current = currentNode();
+  if (startBtn) startBtn.disabled = !trainingState.rootId;
+  if (nextBtn) nextBtn.disabled = !trainingState.rootId;
+  if (revealBtn) revealBtn.disabled = !prompt;
+  if (whyBtn) whyBtn.disabled = !prompt;
+  if (trainerSubmitBtn) trainerSubmitBtn.disabled = !prompt;
+  if (trainerAnswerInput) trainerAnswerInput.disabled = !prompt;
+
+  const canContinue = Boolean(
+    prompt &&
+    (trainingState.result?.kind === "correct" || trainingState.revealOpen)
+  );
+  if (continueBtn) {
+    continueBtn.disabled = !canContinue;
+    continueBtn.textContent = "Continue line";
+  }
+
+  setText(
+    "trainerQueueCount",
+    rootCount
+      ? `${promptCount} prompt${promptCount === 1 ? "" : "s"} ready in ${rootCount} ${rootCount === 1 ? "root" : "roots"}`
+      : `0 ${colorLabel.toLowerCase()} roots ready`
+  );
+
   if ($("trainerSelectionStatus")) {
-    if (!current) {
-      setText("trainerSelectionStatus", "Prompts can come from anywhere in the tree, or focus on the line you selected in the move editor.");
-    } else if (focusPromptAvailable) {
-      setText("trainerSelectionStatus", `Selected focus: ${pathFor(current)}. Use "Train selected" to stay inside this branch.`);
+    if (!selectedRoot) {
+      setText("trainerSelectionStatus", `Choose a ${colorLabel.toLowerCase()} study root, then start a line that continues until your stored moves run out.`);
+    } else if (trainingState.color === "b" && !selectedRoot.parent_id) {
+      setText("trainerSelectionStatus", `Training ${colorLabel.toLowerCase()} in ${selectedRoot.title || selectedRoot.move}. This root is stored as a black-side starting anchor, then the line continues with opponent replies and your responses.`);
     } else {
-      setText("trainerSelectionStatus", `Selected focus: ${pathFor(current)}. This exact node is not a training prompt yet, so random prompts will use the full queue.`);
+      setText("trainerSelectionStatus", `Training ${colorLabel.toLowerCase()} in ${selectedRoot.title || selectedRoot.move}. Preferred moves count as correct answers whenever the position branches.`);
     }
   }
 
-  if (!groups.length) {
+  setText("trainerSessionTitle", selectedRoot ? (selectedRoot.title || selectedRoot.move) : "Choose a study root");
+  setText("trainerSessionSubtitle", selectedRoot ? `Current root move: ${selectedRoot.move}` : "Pick the opening or study root you want to drill.");
+  setText("trainerProgressText", `${trainingState.solvedPrompts} solved prompt${trainingState.solvedPrompts === 1 ? "" : "s"} in this session.`);
+
+  if (!selectedRoot) {
     setText("trainerPositionTitle", "Trainer waiting");
-    setText("trainerTurnPill", "No prompts");
+    setText("trainerTurnPill", "No line active");
+    setText("trainerOpeningValue", `No ${colorLabel.toLowerCase()} root selected`);
+    setText("trainerOpeningCaption", "Create or keep a root line available for training in the move editor.");
+    setText("trainerOpponentMove", "Waiting");
+    setText("trainerOpponentMeta", "The trainer will start speaking in positions as soon as you choose a root.");
     setHtml("trainerPositionLine", `<div class="line-empty">Create moves and leave them available for training to start drilling.</div>`);
-    setText("trainerAcceptedMeta", "Add trainer moves in the editor");
-    setText("trainerHint", 'Moves marked "Do not use for training" are skipped here.');
+    setText("trainerAcceptedMeta", `Only moves marked "Do not use for training" are hidden from this queue.`);
+    setText("trainerHint", "Pick a color, pick a study root, then start the line.");
     setHtml("trainerFeedback", renderTrainerFeedback(null));
     setHtml("trainerReveal", "");
     trainerBoardEl.innerHTML = renderBoardSquares(boardFromFen(), null);
-    if (revealPromptBtn) revealPromptBtn.textContent = "Reveal answer";
     return;
   }
 
-  synchronizeTrainerPrompt();
+  if (!prompt && trainingState.result?.kind !== "line-complete") {
+    setText("trainerPositionTitle", "Line not started");
+    setText("trainerTurnPill", "Ready to train");
+    setText("trainerOpeningValue", selectedRoot.title || selectedRoot.move);
+    setText("trainerOpeningCaption", `Stored root move: ${selectedRoot.move}`);
+    setText("trainerOpponentMove", "Waiting");
+    setText("trainerOpponentMeta", "Start a line and the trainer will surface the first board prompt.");
+    setHtml("trainerPositionLine", `<div class="line-empty">Press "Start line" to drill this root from the board.</div>`);
+    setText("trainerAcceptedMeta", "The trainer will accept preferred moves when the position branches.");
+    setText("trainerHint", "Use Next line any time you want a fresh branch from the same root.");
+    setHtml("trainerFeedback", renderTrainerFeedback(null));
+    setHtml("trainerReveal", "");
+    trainerBoardEl.innerHTML = renderBoardSquares(boardFromFen(), null);
+    return;
+  }
 
-  const prompt = trainerPrompt;
-  const attempt = prompt.positionNodes.length ? bestBoardAttempt(prompt.positionNodes) : null;
-  const game = attempt?.game || createChessGame(prompt.startingTurn || "w");
+  const displayNode = prompt?.positionNode || trainingState.result?.node || null;
+  const displayPath = displayNode ? pathNodesFor(displayNode) : [];
+  const startingTurn = prompt?.positionId === null ? trainingState.color : "w";
+  const attempt = displayPath.length ? bestBoardAttempt(displayPath) : null;
+  const game = attempt?.game || createChessGame(startingTurn);
   const boardReady = Boolean(game);
   const rows = game ? boardRowsFromGame(game) : boardFromFen();
 
   setText("trainerPositionTitle", trainerAnswerTitle(prompt));
   setText("trainerTurnPill", boardReady ? colorToMoveText(game.turn()) : "Board waiting for chess.js");
-  setHtml("trainerPositionLine", renderLineChips(prompt.positionNodes, {
-    emptyText: "The prompt starts from the initial position."
+  setText("trainerOpeningValue", selectedRoot.title || selectedRoot.move);
+  setText("trainerOpeningCaption", `Training ${colorLabel.toLowerCase()} from ${selectedRoot.move}`);
+  setText(
+    "trainerOpponentMove",
+    prompt?.lastOpponentNode
+      ? prompt.lastOpponentNode.move
+      : (trainingState.result?.kind === "line-complete" ? "Line complete" : "No opponent reply yet")
+  );
+  setText(
+    "trainerOpponentMeta",
+    prompt?.lastOpponentNode
+      ? (prompt.lastOpponentNode.title || prompt.lastOpponentNode.explanation || "Tap 'Wanna know why?' to reveal the idea behind that reply.")
+      : (trainingState.result?.kind === "line-complete"
+          ? "The stored branch ended here."
+          : "Your first prompt starts from the selected root.")
+  );
+  setHtml("trainerPositionLine", renderLineChips(displayPath, {
+    emptyText: "The line starts from the initial position."
   }));
   setText(
     "trainerAcceptedMeta",
-    prompt.acceptedNodes.length === 1
-      ? "One repertoire move expected"
-      : `${prompt.acceptedNodes.length} repertoire moves accepted`
+    prompt
+      ? (prompt.acceptedNodes.length === 1
+          ? "One repertoire move expected"
+          : `${prompt.acceptedNodes.length} preferred moves accepted in this position`)
+      : "Start another line whenever you want the next branch."
   );
   setText(
     "trainerHint",
-    prompt.pendingRepairs.length
+    prompt?.pendingRepairs.length
       ? `Repair cue: ${prompt.pendingRepairs[0].lesson || prompt.pendingRepairs[0].mistake || prompt.pendingRepairs[0].repair}`
-      : "Preferred moves are accepted answers when the position branches."
+      : "Reveal the answer if you want the move note, or continue the branch after a correct answer."
   );
   setHtml("trainerFeedback", renderTrainerFeedback(prompt));
-  setHtml("trainerReveal", renderTrainerReveal(prompt));
+  setHtml("trainerReveal", renderTrainerDetails(prompt));
   trainerBoardEl.innerHTML = renderBoardSquares(rows, attempt?.lastMove || null);
 
-  if (revealPromptBtn) {
-    revealPromptBtn.textContent = trainerRevealOpen ? "Hide answer" : "Reveal answer";
+  if (revealBtn) {
+    revealBtn.textContent = trainingState.revealOpen ? "Hide answer" : "Reveal answer";
+  }
+
+  if (whyBtn) {
+    whyBtn.textContent = trainingState.whyOpen ? "Hide why" : "Wanna know why?";
   }
 }
 
@@ -995,7 +1357,7 @@ async function refresh() {
     selectedRepairId = null;
   }
 
-  synchronizeTrainerPrompt();
+  synchronizeTrainingState();
 
   if ($("moveInput")) {
     if (selectedId) populateEditor(nodeById(selectedId));
@@ -1011,15 +1373,109 @@ async function refresh() {
   }
 
   paint();
+  maybePromptForBackups();
 }
 
 function backupPayload() {
   return {
-    version: 4,
+    version: 5,
     exported_at: new Date().toISOString(),
     nodes,
     repairs
   };
+}
+
+function openingNodesPayload() {
+  return {
+    table: window.APP_CONFIG?.TABLE_NAME || "opening_nodes",
+    exported_at: new Date().toISOString(),
+    count: nodes.length,
+    rows: nodes
+  };
+}
+
+function repairItemsPayload() {
+  return {
+    table: window.APP_CONFIG?.REPAIR_TABLE_NAME || "repair_items",
+    exported_at: new Date().toISOString(),
+    count: repairs.length,
+    rows: repairs
+  };
+}
+
+function exportOpeningNodesJson() {
+  downloadJsonFile("gm-opening-tree-opening-nodes.json", openingNodesPayload());
+  showToast("Opening nodes exported.");
+}
+
+function exportRepairItemsJson() {
+  downloadJsonFile("gm-opening-tree-repair-items.json", repairItemsPayload());
+  showToast("Repair items exported.");
+}
+
+function exportAllSafetyBackups() {
+  exportOpeningNodesJson();
+  window.setTimeout(() => exportRepairItemsJson(), 120);
+}
+
+function ensureBackupPrompt() {
+  let dialog = $("backupPromptDialog");
+  if (dialog) return dialog;
+
+  dialog = document.createElement("div");
+  dialog.id = "backupPromptDialog";
+  dialog.className = "backup-prompt hidden";
+  dialog.innerHTML = `
+    <div class="backup-prompt-card" role="dialog" aria-modal="true" aria-labelledby="backupPromptTitle">
+      <p class="eyebrow">Safety export</p>
+      <h3 id="backupPromptTitle">Download both table backups before you work.</h3>
+      <p class="muted">
+        This quick safety step exports the opening tree table and the repair table separately, so if anything goes wrong later you keep a clean snapshot of both.
+      </p>
+      <div class="backup-prompt-meta">
+        <span id="backupPromptNodeCount" class="status-pill">0 opening nodes</span>
+        <span id="backupPromptRepairCount" class="status-pill">0 repair items</span>
+      </div>
+      <div class="backup-prompt-actions">
+        <button id="backupExportAllBtn" class="button button-primary" type="button">Export both now</button>
+        <button id="backupExportNodesBtn" class="button button-secondary" type="button">Opening nodes JSON</button>
+        <button id="backupExportRepairsBtn" class="button button-secondary" type="button">Repair items JSON</button>
+        <button id="backupDismissBtn" class="button button-ghost" type="button">Later</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(dialog);
+
+  $("backupExportAllBtn")?.addEventListener("click", () => {
+    exportAllSafetyBackups();
+    hideBackupPrompt();
+  });
+  $("backupExportNodesBtn")?.addEventListener("click", exportOpeningNodesJson);
+  $("backupExportRepairsBtn")?.addEventListener("click", exportRepairItemsJson);
+  $("backupDismissBtn")?.addEventListener("click", hideBackupPrompt);
+  dialog.addEventListener("click", event => {
+    if (event.target === dialog) hideBackupPrompt();
+  });
+
+  return dialog;
+}
+
+function showBackupPrompt() {
+  const dialog = ensureBackupPrompt();
+  setText("backupPromptNodeCount", `${nodes.length} opening node${nodes.length === 1 ? "" : "s"}`);
+  setText("backupPromptRepairCount", `${repairs.length} repair item${repairs.length === 1 ? "" : "s"}`);
+  dialog.classList.remove("hidden");
+  sessionStorage.setItem(BACKUP_PROMPT_SESSION_KEY, "seen");
+}
+
+function hideBackupPrompt() {
+  $("backupPromptDialog")?.classList.add("hidden");
+}
+
+function maybePromptForBackups() {
+  if (sessionStorage.getItem(BACKUP_PROMPT_SESSION_KEY)) return;
+  showBackupPrompt();
 }
 
 function parseImportedBackup(text) {
@@ -1034,6 +1490,20 @@ function parseImportedBackup(text) {
 
   if (!parsed || typeof parsed !== "object") {
     throw new Error("Backup file is not a valid JSON object.");
+  }
+
+  if (parsed.table === (window.APP_CONFIG?.TABLE_NAME || "opening_nodes") && Array.isArray(parsed.rows)) {
+    return {
+      nodes: parsed.rows.map(OpeningDB.normalizeNode),
+      repairs
+    };
+  }
+
+  if (parsed.table === (window.APP_CONFIG?.REPAIR_TABLE_NAME || "repair_items") && Array.isArray(parsed.rows)) {
+    return {
+      nodes,
+      repairs: parsed.rows.map(OpeningDB.normalizeRepairItem)
+    };
   }
 
   const importedNodes = Array.isArray(parsed.nodes)
@@ -1064,6 +1534,7 @@ if (moveForm) {
       setSelectedNodeId(node.id);
 
       await refresh();
+      showToast(navigator.onLine ? "Move saved." : "Move saved locally.");
     } catch (error) {
       reportActionError("Saving move", error);
     }
@@ -1091,6 +1562,7 @@ if (repairForm) {
       selectedRepairId = repair.id;
 
       await refresh();
+      showToast(navigator.onLine ? "Repair saved." : "Repair saved locally.");
     } catch (error) {
       reportActionError("Saving repair", error);
     }
@@ -1102,27 +1574,27 @@ if (trainerForm) {
   trainerForm.addEventListener("submit", event => {
     event.preventDefault();
 
-    if (!trainerPrompt) return;
+    const prompt = trainingState.prompt;
+    if (!prompt) return;
 
     const answer = $("trainerAnswerInput").value.trim();
     if (!answer) return;
 
-    const acceptedNode = trainerPrompt.acceptedNodes.find(node => moveTextMatches(answer, node.move));
+    const acceptedNode = prompt.acceptedNodes.find(node => moveTextMatches(answer, node.move));
 
     if (acceptedNode) {
-      trainerResult = { kind: "correct", node: acceptedNode };
+      trainingState.result = { kind: "correct", node: acceptedNode };
     } else {
-      const siblingNode = trainerPrompt.allChildren.find(node => moveTextMatches(answer, node.move));
+      const siblingNode = prompt.allChildren.find(node => moveTextMatches(answer, node.move));
       if (siblingNode?.exclude_from_training) {
-        trainerResult = { kind: "excluded-branch", node: siblingNode };
+        trainingState.result = { kind: "excluded-branch", node: siblingNode };
       } else if (siblingNode) {
-        trainerResult = { kind: "tree-branch", node: siblingNode };
+        trainingState.result = { kind: "tree-branch", node: siblingNode };
       } else {
-        trainerResult = { kind: "incorrect" };
+        trainingState.result = { kind: "incorrect" };
       }
     }
 
-    trainerRevealOpen = true;
     paintTrainer();
   });
 }
@@ -1194,6 +1666,7 @@ if (repairListEl) {
           status: repair.status === "solved" ? "needs_work" : "solved"
         });
         await refresh();
+        showToast(repair.status === "solved" ? "Repair reopened." : "Repair marked solved.");
       } catch (error) {
         reportActionError("Updating repair status", error);
       }
@@ -1208,6 +1681,7 @@ if (repairListEl) {
         }
         await OpeningDB.deleteRepairItem(repair.id);
         await refresh();
+        showToast("Repair deleted.");
       } catch (error) {
         reportActionError("Deleting repair", error);
       }
@@ -1242,6 +1716,7 @@ if (addChildBtn) {
       setSelectedNodeId(child.id);
 
       await refresh();
+      showToast(navigator.onLine ? "Child move added." : "Child move added locally.");
     } catch (error) {
       reportActionError("Adding child move", error);
     }
@@ -1259,6 +1734,7 @@ if (deleteBtn) {
       await OpeningDB.deleteNodeAndChildren(deletedNode.id);
 
       await refresh();
+      showToast("Move deleted.");
     } catch (error) {
       reportActionError("Deleting move", error);
     }
@@ -1270,6 +1746,7 @@ if (syncBtn) {
   syncBtn.addEventListener("click", async () => {
     try {
       await refresh();
+      showToast(navigator.onLine ? "Workspace synced." : "Offline mode active. Using your local copy.");
     } catch (error) {
       reportActionError("Syncing data", error);
     }
@@ -1287,16 +1764,66 @@ if (splitCompoundBtn) {
   });
 }
 
-const newPromptBtn = $("newPromptBtn");
-if (newPromptBtn) newPromptBtn.addEventListener("click", () => queueTrainerPrompt());
+const trainerColorWhiteBtn = $("trainerColorWhiteBtn");
+if (trainerColorWhiteBtn) {
+  trainerColorWhiteBtn.addEventListener("click", () => switchTrainingColor("w"));
+}
 
-const selectedPromptBtn = $("selectedPromptBtn");
-if (selectedPromptBtn) selectedPromptBtn.addEventListener("click", () => queueTrainerPrompt({ focusSelection: true }));
+const trainerColorBlackBtn = $("trainerColorBlackBtn");
+if (trainerColorBlackBtn) {
+  trainerColorBlackBtn.addEventListener("click", () => switchTrainingColor("b"));
+}
+
+const trainerRootSelect = $("trainerRootSelect");
+if (trainerRootSelect) {
+  trainerRootSelect.addEventListener("change", event => {
+    trainingState.rootId = event.target.value || null;
+    trainingState.prompt = null;
+    trainingState.result = null;
+    trainingState.revealOpen = false;
+    trainingState.whyOpen = false;
+    trainingState.lastOpponentNodeId = null;
+    paintTrainer();
+  });
+}
+
+const startTrainingBtn = $("startTrainingBtn");
+if (startTrainingBtn) {
+  startTrainingBtn.addEventListener("click", beginTrainingLine);
+}
+
+const continueTrainingBtn = $("continueTrainingBtn");
+if (continueTrainingBtn) {
+  continueTrainingBtn.addEventListener("click", () => {
+    const prompt = trainingState.prompt;
+    if (!prompt) return;
+
+    const chosenNode = trainingState.result?.kind === "correct"
+      ? trainingState.result.node
+      : prompt.acceptedNodes[0];
+    continueTrainingLine(chosenNode);
+  });
+}
+
+const nextTrainingBtn = $("nextTrainingBtn");
+if (nextTrainingBtn) {
+  nextTrainingBtn.addEventListener("click", beginTrainingLine);
+}
 
 const revealPromptBtn = $("revealPromptBtn");
 if (revealPromptBtn) {
   revealPromptBtn.addEventListener("click", () => {
-    trainerRevealOpen = !trainerRevealOpen;
+    if (!trainingState.prompt) return;
+    trainingState.revealOpen = !trainingState.revealOpen;
+    paintTrainer();
+  });
+}
+
+const whyPromptBtn = $("whyPromptBtn");
+if (whyPromptBtn) {
+  whyPromptBtn.addEventListener("click", () => {
+    if (!trainingState.prompt) return;
+    trainingState.whyOpen = !trainingState.whyOpen;
     paintTrainer();
   });
 }
@@ -1329,14 +1856,7 @@ if (repairFilterInput) repairFilterInput.addEventListener("change", renderRepair
 
 const exportBtn = $("exportBtn");
 if (exportBtn) {
-  exportBtn.addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify(backupPayload(), null, 2)], { type: "application/json" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "gm-opening-tree-backup.json";
-    link.click();
-    URL.revokeObjectURL(link.href);
-  });
+  exportBtn.addEventListener("click", exportAllSafetyBackups);
 }
 
 const importBtn = $("importBtn");
@@ -1355,9 +1875,13 @@ if (importBtn && importInput) {
       await OpeningDB.saveAllRepairItems(imported.repairs);
       setSelectedNodeId(null);
       selectedRepairId = null;
-      setTrainerPrompt(null);
+      trainingState.prompt = null;
+      trainingState.result = null;
+      trainingState.revealOpen = false;
+      trainingState.whyOpen = false;
+      trainingState.lastOpponentNodeId = null;
       await refresh();
-      alert("Backup imported.");
+      showToast("Backup imported.");
     } catch (error) {
       console.error("Import failed:", error);
       alert(`Import failed: ${error.message}`);

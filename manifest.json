@@ -5,7 +5,7 @@
   "display": "standalone",
   "background_color": "#08111d",
   "theme_color": "#08111d",
-  "description": "A private chess study workspace with a dashboard, move editor, board-first training, random review, and repair loops.",
+  "description": "A private chess study workspace with a dashboard, move editor, sequential board training, and repair loops.",
   "icons": [
     {
       "src": "assets/icon.svg",
@@ -15,10 +15,10 @@
   ],
   "shortcuts": [
     {
-      "name": "Random Review",
-      "short_name": "Review",
-      "description": "Open a shuffled opening review card.",
-      "url": "random.html",
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Open the study dashboard.",
+      "url": "index.html",
       "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
     },
     {
@@ -31,7 +31,7 @@
     {
       "name": "Training Mode",
       "short_name": "Training",
-      "description": "Launch the board-first trainer.",
+      "description": "Launch the sequential board trainer.",
       "url": "training.html",
       "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
     },

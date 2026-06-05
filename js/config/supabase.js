@@ -1,6 +1,9 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 const existingClient = typeof window !== "undefined" ? window.GM_SUPABASE_CLIENT : null;
+const createClient = typeof window !== "undefined" ? window.supabase?.createClient : null;
+
+if (!existingClient && typeof createClient !== "function") {
+  throw new Error("Supabase browser library did not load. Make sure vendor/supabase-js.min.js is included before the app modules.");
+}
 
 export const supabase = existingClient || createClient(
   "https://puhscovkftoffykeyzze.supabase.co",
