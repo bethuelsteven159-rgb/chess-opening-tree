@@ -1,6 +1,10 @@
 const LEGACY_NODE_STORAGE_KEY = "gm_opening_tree_local_v1";
 const NODE_STORAGE_KEY = "gm_opening_tree_local_v2";
 const REPAIR_STORAGE_KEY = "gm_opening_tree_repairs_v1";
+const NODE_SNAPSHOT_KEY = "gm_opening_tree_local_snapshot_v1";
+const REPAIR_SNAPSHOT_KEY = "gm_opening_tree_repairs_snapshot_v1";
+const PENDING_NODE_SYNC_KEY = "gm_opening_tree_nodes_pending_sync_v1";
+const PENDING_REPAIR_SYNC_KEY = "gm_opening_tree_repairs_pending_sync_v1";
 
 const supportCache = new Map();
 
@@ -154,24 +158,98 @@ function writeLocalJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
-function loadLocalNodes() {
-  const raw = readLocalJson(NODE_STORAGE_KEY) || readLocalJson(LEGACY_NODE_STORAGE_KEY);
+function clearLocalJson(key) {
+  localStorage.removeItem(key);
+}
 
-  if (!raw) {
-    const cleanSeed = seedNodes.map(normalizeNode);
-    writeLocalJson(NODE_STORAGE_KEY, cleanSeed);
-    return cleanSeed;
+function hasLocalJson(key) {
+  return localStorage.getItem(key) !== null;
+}
+
+function readStoredArray(key, normalizer) {
+  const raw = readLocalJson(key);
+  return Array.isArray(raw) ? raw.map(normalizer) : [];
+}
+
+function writeNonEmptySnapshot(key, value) {
+  if (Array.isArray(value) && value.length) {
+    writeLocalJson(key, value);
+  }
+}
+
+function storeCurrentNodes(nodes) {
+  writeLocalJson(NODE_STORAGE_KEY, nodes);
+  writeNonEmptySnapshot(NODE_SNAPSHOT_KEY, nodes);
+}
+
+function storeCurrentRepairs(items) {
+  writeLocalJson(REPAIR_STORAGE_KEY, items);
+  writeNonEmptySnapshot(REPAIR_SNAPSHOT_KEY, items);
+}
+
+function loadPendingNodes() {
+  return readStoredArray(PENDING_NODE_SYNC_KEY, normalizeNode);
+}
+
+function loadPendingRepairs() {
+  return readStoredArray(PENDING_REPAIR_SYNC_KEY, normalizeRepairItem);
+}
+
+function markPendingNodes(nodes) {
+  writeLocalJson(PENDING_NODE_SYNC_KEY, nodes);
+}
+
+function markPendingRepairs(items) {
+  writeLocalJson(PENDING_REPAIR_SYNC_KEY, items);
+}
+
+function clearPendingNodes() {
+  clearLocalJson(PENDING_NODE_SYNC_KEY);
+}
+
+function clearPendingRepairs() {
+  clearLocalJson(PENDING_REPAIR_SYNC_KEY);
+}
+
+function loadLocalNodes() {
+  if (hasLocalJson(NODE_STORAGE_KEY)) {
+    const clean = readStoredArray(NODE_STORAGE_KEY, normalizeNode);
+    storeCurrentNodes(clean);
+    return clean;
   }
 
-  const clean = raw.map(normalizeNode);
-  writeLocalJson(NODE_STORAGE_KEY, clean);
-  return clean;
+  if (hasLocalJson(LEGACY_NODE_STORAGE_KEY)) {
+    const clean = readStoredArray(LEGACY_NODE_STORAGE_KEY, normalizeNode);
+    storeCurrentNodes(clean);
+    return clean;
+  }
+
+  const snapshot = readStoredArray(NODE_SNAPSHOT_KEY, normalizeNode);
+  if (snapshot.length) {
+    storeCurrentNodes(snapshot);
+    return snapshot;
+  }
+
+  const cleanSeed = seedNodes.map(normalizeNode);
+  storeCurrentNodes(cleanSeed);
+  return cleanSeed;
 }
 
 function loadLocalRepairs() {
-  const raw = readLocalJson(REPAIR_STORAGE_KEY) || [];
-  const clean = raw.map(normalizeRepairItem);
-  writeLocalJson(REPAIR_STORAGE_KEY, clean);
+  if (hasLocalJson(REPAIR_STORAGE_KEY)) {
+    const clean = readStoredArray(REPAIR_STORAGE_KEY, normalizeRepairItem);
+    storeCurrentRepairs(clean);
+    return clean;
+  }
+
+  const snapshot = readStoredArray(REPAIR_SNAPSHOT_KEY, normalizeRepairItem);
+  if (snapshot.length) {
+    storeCurrentRepairs(snapshot);
+    return snapshot;
+  }
+
+  const clean = [];
+  storeCurrentRepairs(clean);
   return clean;
 }
 
@@ -187,6 +265,79 @@ function isMissingColumnError(error, columnName) {
 function isMissingTableError(error, tableName) {
   const text = describeError(error);
   return text.includes(tableName.toLowerCase()) || text.includes("does not exist") || text.includes("relation");
+}
+
+function rowsMatchExactly(sourceRows, expectedRows) {
+  if (sourceRows.length !== expectedRows.length) return false;
+
+  const serializedById = new Map(
+    sourceRows.map(row => [row.id, JSON.stringify(row)])
+  );
+
+  return expectedRows.every(row => serializedById.get(row.id) === JSON.stringify(row));
+}
+
+function ensureUniqueIds(items, label) {
+  const seen = new Set();
+
+  for (const item of items) {
+    if (seen.has(item.id)) {
+      throw new Error(`Cannot save ${label}: duplicate id ${item.id}.`);
+    }
+
+    seen.add(item.id);
+  }
+}
+
+function topologicallySortNodes(nodes) {
+  ensureUniqueIds(nodes, "opening tree");
+
+  const byId = new Map(nodes.map(node => [node.id, node]));
+  const visiting = new Set();
+  const visited = new Set();
+  const ordered = [];
+
+  function visit(node) {
+    if (visited.has(node.id)) return;
+
+    if (visiting.has(node.id)) {
+      throw new Error("Cannot save the opening tree because it contains a parent cycle.");
+    }
+
+    visiting.add(node.id);
+
+    if (node.parent_id) {
+      const parent = byId.get(node.parent_id);
+      if (!parent) {
+        throw new Error(`Cannot save move "${node.move}" because its parent is missing from the tree.`);
+      }
+
+      visit(parent);
+    }
+
+    visiting.delete(node.id);
+    visited.add(node.id);
+    ordered.push(node);
+  }
+
+  for (const node of nodes) {
+    visit(node);
+  }
+
+  return ordered;
+}
+
+function deleteRootsForRemovedNodes(remoteNodes, keepIds) {
+  const remoteById = new Map(remoteNodes.map(node => [node.id, node]));
+  const removeIds = remoteNodes
+    .filter(node => !keepIds.has(node.id))
+    .map(node => node.id);
+  const removeSet = new Set(removeIds);
+
+  return removeIds.filter(id => {
+    const parentId = remoteById.get(id)?.parent_id || null;
+    return !parentId || !removeSet.has(parentId);
+  });
 }
 
 async function supportsColumn(client, table, columnName) {
@@ -250,60 +401,160 @@ async function repairTableAvailable(client, table) {
   throw error;
 }
 
+async function loadNodesFromRemote(client, table) {
+  const { data, error } = await client
+    .from(table)
+    .select("*")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Supabase load failed:", error);
+    throw error;
+  }
+
+  return (data || []).map(normalizeNode);
+}
+
+async function loadRepairItemsFromRemote(client, table) {
+  const { data, error } = await client
+    .from(table)
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Supabase repair load failed:", error);
+    throw error;
+  }
+
+  return (data || []).map(normalizeRepairItem);
+}
+
+async function syncNodesToRemote(client, table, clean) {
+  const support = await openingNodeSupport(client, table);
+  const remoteNodes = await loadNodesFromRemote(client, table);
+
+  if (!clean.length && remoteNodes.length) {
+    throw new Error("Refusing to replace a non-empty opening tree with an empty save payload.");
+  }
+
+  const orderedNodes = topologicallySortNodes(clean);
+
+  for (const node of orderedNodes) {
+    const row = stripUnsupportedNodeFields(node, support);
+    const { error } = await client.from(table).upsert(row, { onConflict: "id" });
+
+    if (error) {
+      console.error("Supabase upsert failed:", error);
+      throw error;
+    }
+  }
+
+  const keepIds = new Set(clean.map(node => node.id));
+  const deleteRoots = deleteRootsForRemovedNodes(remoteNodes, keepIds);
+
+  for (const id of deleteRoots) {
+    const { error } = await client.from(table).delete().eq("id", id);
+
+    if (error) {
+      console.error("Supabase delete failed:", error);
+      throw error;
+    }
+  }
+}
+
+async function syncRepairItemsToRemote(client, table, clean) {
+  const remoteItems = await loadRepairItemsFromRemote(client, table);
+
+  if (!clean.length && remoteItems.length) {
+    throw new Error("Refusing to replace a non-empty repair list with an empty save payload.");
+  }
+
+  ensureUniqueIds(clean, "repair list");
+
+  for (const item of clean) {
+    const { error } = await client.from(table).upsert(item, { onConflict: "id" });
+
+    if (error) {
+      console.error("Supabase repair upsert failed:", error);
+      throw error;
+    }
+  }
+
+  const keepIds = new Set(clean.map(item => item.id));
+  const removeIds = remoteItems
+    .filter(item => !keepIds.has(item.id))
+    .map(item => item.id);
+
+  if (removeIds.length) {
+    const { error } = await client.from(table).delete().in("id", removeIds);
+
+    if (error) {
+      console.error("Supabase repair delete failed:", error);
+      throw error;
+    }
+  }
+}
+
 async function loadNodes() {
+  const localNodes = loadLocalNodes();
+  const pendingNodes = loadPendingNodes();
   const client = getClient();
   const table = window.APP_CONFIG?.TABLE_NAME || "opening_nodes";
 
-  if (client) {
-    const { data, error } = await client
-      .from(table)
-      .select("*")
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      console.error("Supabase load failed:", error);
-      throw error;
+  if (!client) {
+    if (pendingNodes.length) {
+      storeCurrentNodes(pendingNodes);
+      return pendingNodes;
     }
 
-    const clean = (data || []).map(normalizeNode);
-    writeLocalJson(NODE_STORAGE_KEY, clean);
-    return clean;
+    return localNodes;
   }
 
-  return loadLocalNodes();
+  const remoteNodes = await loadNodesFromRemote(client, table);
+
+  if (pendingNodes.length && !rowsMatchExactly(remoteNodes, pendingNodes)) {
+    console.warn("Remote opening tree does not match the pending local sync. Preserving the local recovery copy instead of overwriting it.");
+    storeCurrentNodes(pendingNodes);
+    return pendingNodes;
+  }
+
+  if (!remoteNodes.length && localNodes.length) {
+    console.warn("Remote opening tree is empty while local data still exists. Preserving the local tree instead of overwriting it.");
+    return localNodes;
+  }
+
+  storeCurrentNodes(remoteNodes);
+  clearPendingNodes();
+  return remoteNodes;
 }
 
 async function saveAllNodes(nodes) {
   const clean = nodes.map(normalizeNode);
-  writeLocalJson(NODE_STORAGE_KEY, clean);
-
   const client = getClient();
   const table = window.APP_CONFIG?.TABLE_NAME || "opening_nodes";
 
-  if (!client) return clean;
-
-  const support = await openingNodeSupport(client, table);
-  const rows = clean.map(node => stripUnsupportedNodeFields(node, support));
-
-  const { error: deleteError } = await client
-    .from(table)
-    .delete()
-    .neq("id", "00000000-0000-0000-0000-000000000000");
-
-  if (deleteError) {
-    console.error("Supabase delete failed:", deleteError);
-    throw deleteError;
-  }
-
-  if (rows.length) {
-    const { error: insertError } = await client.from(table).insert(rows);
-
-    if (insertError) {
-      console.error("Supabase insert failed:", insertError);
-      throw insertError;
+  if (!clean.length) {
+    if (client) {
+      const remoteNodes = await loadNodesFromRemote(client, table);
+      if (remoteNodes.length) {
+        throw new Error("Refusing to replace a non-empty opening tree with an empty bulk save.");
+      }
+    } else if (loadLocalNodes().length) {
+      throw new Error("Refusing to replace a non-empty local opening tree with an empty bulk save.");
     }
   }
 
+  storeCurrentNodes(clean);
+  markPendingNodes(clean);
+
+  if (!client) {
+    clearPendingNodes();
+    return clean;
+  }
+
+  await syncNodesToRemote(client, table, clean);
+  storeCurrentNodes(clean);
+  clearPendingNodes();
   return clean;
 }
 
@@ -330,7 +581,19 @@ async function deleteNodeAndChildren(id) {
   const removeIds = new Set([id, ...childrenOf(id)]);
   const kept = nodes.filter(node => !removeIds.has(node.id));
 
-  await saveAllNodes(kept);
+  const client = getClient();
+  const table = window.APP_CONFIG?.TABLE_NAME || "opening_nodes";
+
+  if (client) {
+    const { error } = await client.from(table).delete().eq("id", id);
+    if (error) {
+      console.error("Supabase subtree delete failed:", error);
+      throw error;
+    }
+  }
+
+  storeCurrentNodes(kept);
+  clearPendingNodes();
 
   const repairs = await loadRepairItems();
   const filteredRepairs = repairs.map(repair =>
@@ -338,63 +601,71 @@ async function deleteNodeAndChildren(id) {
       ? { ...repair, related_node_id: null }
       : repair
   );
-  await saveAllRepairItems(filteredRepairs);
 
+  await saveAllRepairItems(filteredRepairs);
   return kept;
 }
 
 async function loadRepairItems() {
-  const client = getClient();
-  const table = window.APP_CONFIG?.REPAIR_TABLE_NAME || "repair_items";
-
-  if (client && await repairTableAvailable(client, table)) {
-    const { data, error } = await client
-      .from(table)
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Supabase repair load failed:", error);
-      throw error;
-    }
-
-    const clean = (data || []).map(normalizeRepairItem);
-    writeLocalJson(REPAIR_STORAGE_KEY, clean);
-    return clean;
-  }
-
-  return loadLocalRepairs();
-}
-
-async function saveAllRepairItems(items) {
-  const clean = items.map(normalizeRepairItem);
-  writeLocalJson(REPAIR_STORAGE_KEY, clean);
-
+  const localRepairs = loadLocalRepairs();
+  const pendingRepairs = loadPendingRepairs();
   const client = getClient();
   const table = window.APP_CONFIG?.REPAIR_TABLE_NAME || "repair_items";
 
   if (!client || !(await repairTableAvailable(client, table))) {
-    return clean;
+    if (pendingRepairs.length) {
+      storeCurrentRepairs(pendingRepairs);
+      return pendingRepairs;
+    }
+
+    return localRepairs;
   }
 
-  const { error: deleteError } = await client
-    .from(table)
-    .delete()
-    .neq("id", "00000000-0000-0000-0000-000000000000");
+  const remoteItems = await loadRepairItemsFromRemote(client, table);
 
-  if (deleteError) {
-    console.error("Supabase repair delete failed:", deleteError);
-    throw deleteError;
+  if (pendingRepairs.length && !rowsMatchExactly(remoteItems, pendingRepairs)) {
+    console.warn("Remote repair list does not match the pending local sync. Preserving the local recovery copy instead of overwriting it.");
+    storeCurrentRepairs(pendingRepairs);
+    return pendingRepairs;
   }
 
-  if (clean.length) {
-    const { error: insertError } = await client.from(table).insert(clean);
-    if (insertError) {
-      console.error("Supabase repair insert failed:", insertError);
-      throw insertError;
+  if (!remoteItems.length && localRepairs.length) {
+    console.warn("Remote repair list is empty while local data still exists. Preserving the local repair copy instead of overwriting it.");
+    return localRepairs;
+  }
+
+  storeCurrentRepairs(remoteItems);
+  clearPendingRepairs();
+  return remoteItems;
+}
+
+async function saveAllRepairItems(items) {
+  const clean = items.map(normalizeRepairItem);
+  const client = getClient();
+  const table = window.APP_CONFIG?.REPAIR_TABLE_NAME || "repair_items";
+
+  if (!clean.length) {
+    if (client && await repairTableAvailable(client, table)) {
+      const remoteItems = await loadRepairItemsFromRemote(client, table);
+      if (remoteItems.length) {
+        throw new Error("Refusing to replace a non-empty repair list with an empty bulk save.");
+      }
+    } else if (loadLocalRepairs().length) {
+      throw new Error("Refusing to replace a non-empty local repair list with an empty bulk save.");
     }
   }
 
+  storeCurrentRepairs(clean);
+  markPendingRepairs(clean);
+
+  if (!client || !(await repairTableAvailable(client, table))) {
+    clearPendingRepairs();
+    return clean;
+  }
+
+  await syncRepairItemsToRemote(client, table, clean);
+  storeCurrentRepairs(clean);
+  clearPendingRepairs();
   return clean;
 }
 
@@ -413,7 +684,19 @@ async function upsertRepairItem(item) {
 async function deleteRepairItem(id) {
   const repairs = await loadRepairItems();
   const kept = repairs.filter(entry => entry.id !== id);
-  await saveAllRepairItems(kept);
+  const client = getClient();
+  const table = window.APP_CONFIG?.REPAIR_TABLE_NAME || "repair_items";
+
+  if (client && await repairTableAvailable(client, table)) {
+    const { error } = await client.from(table).delete().eq("id", id);
+    if (error) {
+      console.error("Supabase repair delete failed:", error);
+      throw error;
+    }
+  }
+
+  storeCurrentRepairs(kept);
+  clearPendingRepairs();
   return kept;
 }
 

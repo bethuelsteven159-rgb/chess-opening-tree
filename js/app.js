@@ -60,6 +60,21 @@ function setHtml(id, value) {
   if (element) element.innerHTML = value;
 }
 
+function formatActionError(error, fallback = "Unknown error.") {
+  const parts = [
+    error?.message,
+    error?.details,
+    error?.hint
+  ].filter(Boolean).map(value => String(value).trim());
+
+  return parts.join(" ") || fallback;
+}
+
+function reportActionError(actionLabel, error) {
+  console.error(`${actionLabel} failed:`, error);
+  alert(`${actionLabel} failed.\n\n${formatActionError(error)}\n\nYour local recovery copy was kept so the app should not wipe your tree.`);
+}
+
 function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>'"]/g, char => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]
@@ -1042,12 +1057,16 @@ if (moveForm) {
   moveForm.addEventListener("submit", async event => {
     event.preventDefault();
 
-    const existing = nodeById(selectedId);
-    const node = getFormNode(existing?.parent_id || null, selectedId || null);
-    await OpeningDB.upsertNode(node);
-    setSelectedNodeId(node.id);
+    try {
+      const existing = nodeById(selectedId);
+      const node = getFormNode(existing?.parent_id || null, selectedId || null);
+      await OpeningDB.upsertNode(node);
+      setSelectedNodeId(node.id);
 
-    await refresh();
+      await refresh();
+    } catch (error) {
+      reportActionError("Saving move", error);
+    }
   });
 }
 
@@ -1056,21 +1075,25 @@ if (repairForm) {
   repairForm.addEventListener("submit", async event => {
     event.preventDefault();
 
-    const repair = {
-      id: $("repairIdInput").value || crypto.randomUUID(),
-      related_node_id: $("repairNodeIdInput").value || null,
-      position_path: $("repairPathInput").value.trim(),
-      mistake: $("repairMistakeInput").value.trim(),
-      lesson: $("repairLessonInput").value.trim(),
-      repair: $("repairActionInput").value.trim(),
-      status: $("repairStatusInput").value,
-      created_at: repairById($("repairIdInput").value)?.created_at || new Date().toISOString()
-    };
+    try {
+      const repair = {
+        id: $("repairIdInput").value || crypto.randomUUID(),
+        related_node_id: $("repairNodeIdInput").value || null,
+        position_path: $("repairPathInput").value.trim(),
+        mistake: $("repairMistakeInput").value.trim(),
+        lesson: $("repairLessonInput").value.trim(),
+        repair: $("repairActionInput").value.trim(),
+        status: $("repairStatusInput").value,
+        created_at: repairById($("repairIdInput").value)?.created_at || new Date().toISOString()
+      };
 
-    await OpeningDB.upsertRepairItem(repair);
-    selectedRepairId = repair.id;
+      await OpeningDB.upsertRepairItem(repair);
+      selectedRepairId = repair.id;
 
-    await refresh();
+      await refresh();
+    } catch (error) {
+      reportActionError("Saving repair", error);
+    }
   });
 }
 
@@ -1165,21 +1188,29 @@ if (repairListEl) {
     }
 
     if (action === "toggle") {
-      await OpeningDB.upsertRepairItem({
-        ...repair,
-        status: repair.status === "solved" ? "needs_work" : "solved"
-      });
-      await refresh();
+      try {
+        await OpeningDB.upsertRepairItem({
+          ...repair,
+          status: repair.status === "solved" ? "needs_work" : "solved"
+        });
+        await refresh();
+      } catch (error) {
+        reportActionError("Updating repair status", error);
+      }
       return;
     }
 
     if (action === "delete" && confirm("Delete this repair loop?")) {
-      if (selectedRepairId === repair.id) {
-        selectedRepairId = null;
-        resetRepairForm({ keepSelectionLink: true });
+      try {
+        if (selectedRepairId === repair.id) {
+          selectedRepairId = null;
+          resetRepairForm({ keepSelectionLink: true });
+        }
+        await OpeningDB.deleteRepairItem(repair.id);
+        await refresh();
+      } catch (error) {
+        reportActionError("Deleting repair", error);
       }
-      await OpeningDB.deleteRepairItem(repair.id);
-      await refresh();
     }
   });
 }
@@ -1192,24 +1223,28 @@ if (addChildBtn) {
   addChildBtn.addEventListener("click", async () => {
     if (!selectedId) return;
 
-    const child = {
-      id: crypto.randomUUID(),
-      parent_id: selectedId,
-      move: "New move",
-      title: "",
-      highlight_kind: "",
-      explanation: "",
-      tags: [],
-      exclude_from_training: false,
-      is_practice_card: true,
-      is_preferred: false,
-      created_at: new Date().toISOString()
-    };
+    try {
+      const child = {
+        id: crypto.randomUUID(),
+        parent_id: selectedId,
+        move: "New move",
+        title: "",
+        highlight_kind: "",
+        explanation: "",
+        tags: [],
+        exclude_from_training: false,
+        is_practice_card: true,
+        is_preferred: false,
+        created_at: new Date().toISOString()
+      };
 
-    await OpeningDB.upsertNode(child);
-    setSelectedNodeId(child.id);
+      await OpeningDB.upsertNode(child);
+      setSelectedNodeId(child.id);
 
-    await refresh();
+      await refresh();
+    } catch (error) {
+      reportActionError("Adding child move", error);
+    }
   });
 }
 
@@ -1218,19 +1253,39 @@ if (deleteBtn) {
   deleteBtn.addEventListener("click", async () => {
     if (!selectedId || !confirm("Delete this move and all child lines?")) return;
 
-    const deletedNode = nodeById(selectedId);
-    setSelectedNodeId(deletedNode?.parent_id || null);
-    await OpeningDB.deleteNodeAndChildren(deletedNode.id);
+    try {
+      const deletedNode = nodeById(selectedId);
+      setSelectedNodeId(deletedNode?.parent_id || null);
+      await OpeningDB.deleteNodeAndChildren(deletedNode.id);
 
-    await refresh();
+      await refresh();
+    } catch (error) {
+      reportActionError("Deleting move", error);
+    }
   });
 }
 
 const syncBtn = $("syncBtn");
-if (syncBtn) syncBtn.addEventListener("click", refresh);
+if (syncBtn) {
+  syncBtn.addEventListener("click", async () => {
+    try {
+      await refresh();
+    } catch (error) {
+      reportActionError("Syncing data", error);
+    }
+  });
+}
 
 const splitCompoundBtn = $("splitCompoundBtn");
-if (splitCompoundBtn) splitCompoundBtn.addEventListener("click", splitCompoundMovesOnce);
+if (splitCompoundBtn) {
+  splitCompoundBtn.addEventListener("click", async () => {
+    try {
+      await splitCompoundMovesOnce();
+    } catch (error) {
+      reportActionError("Splitting compound moves", error);
+    }
+  });
+}
 
 const newPromptBtn = $("newPromptBtn");
 if (newPromptBtn) newPromptBtn.addEventListener("click", () => queueTrainerPrompt());
@@ -1314,4 +1369,8 @@ if (importBtn && importInput) {
 
 if ($("moveInput")) populateEditor(null);
 if ($("repairForm")) resetRepairForm({ keepSelectionLink: false });
-await refresh();
+try {
+  await refresh();
+} catch (error) {
+  reportActionError("Loading data", error);
+}
