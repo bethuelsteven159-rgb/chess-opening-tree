@@ -1,429 +1,260 @@
 # GM Opening Tree
 
-GM Opening Tree is a private chess study workspace for one owner account.
-
-The app is now organized around three main jobs:
-
-1. Build and edit the tree.
-2. Train the tree from the board.
-3. Repair mistakes until they are truly solved.
+GM Opening Tree is now moving from an opening-only workspace toward a personal chess brain.
 
-It is designed so middlegame and endgame modules can be added later without cramming everything into one screen.
+The app is private, owner-only, offline-friendly after login, and designed to turn:
 
-## What Changed In This Build
+- opening theory
+- personal games
+- extracted positions
+- recurring mistakes
+- repair drills
 
-- The old standalone random-review flow was folded into training mode.
-- Training now starts by choosing:
-  - the color to train
-  - the opening or study root to train
-- Training now runs as a sequential line session:
-  - you see the board
-  - you see the opponent reply when applicable
-  - you enter your move
-  - you can reveal the answer
-  - you can ask why
-  - you can continue the line or jump to the next line
-- On app entry, the app now asks you to export safety JSON backups for both tables.
-- Save actions now show success feedback.
-- The protected app now works offline as long as you already have a saved session and do not log out.
-- Supabase sync is now safer:
-  - local saves are preserved
-  - failed remote syncs do not wipe the tree
-  - offline saves stay local and can sync later
-- The random page was retired as a real workflow and now just redirects to training for old links and shortcuts.
-- Remote runtime dependencies were replaced with local bundled vendor files so offline mode is real.
+into one connected study system.
 
-## Page Map
+## Current Modules
 
-- `index.html`
-  Dashboard.
-  Lets you choose the main study job.
+### `index.html`
+Dashboard.
 
-- `editor.html`
-  Move editor workspace.
-  Contains:
-  - line explorer
-  - move editor
-  - live board
-  - import/export controls
+What it does now:
 
-- `training.html`
-  Sequential board trainer.
-  Choose a color and study root, then train the branch line by line.
+- shows high-level counts for moves, games, positions, mistakes, and repairs
+- launches the main study lanes
+- shows a weakness heatmap from extracted mistake categories
+- shows the unfinished game-analysis queue
 
-- `repair.html`
-  Repair loop workspace.
-  Stores mistake, lesson, repair, and solved state.
+### `editor.html`
+Move editor workspace.
 
-- `login.html`
-  Owner-only Google sign-in page.
+What it includes:
 
-- `random.html`
-  Legacy redirect page.
-  It now forwards to `training.html`.
+- line explorer
+- move editor
+- live board
+- move explanations
+- preferred-move flags
+- do-not-train flags
+- import/export backup controls
 
-## Dashboard
+### `games.html`
+Game Analysis Studio.
 
-The dashboard is now the high-level launcher.
+What it includes:
 
-Current study lanes:
+- PGN paste/import
+- PGN file import
+- board replay
+- move list replay navigation
+- move-by-move human notes
+- critical moment marker
+- create Position Vault entry from current move
+- create mistake record from current move
+- create repair card from current move
+- automatic opening-link attempt against the opening tree
 
-- `Move editor`
-- `Training mode`
-- `Repair loop`
+### `positions.html`
+Position Vault.
 
-The dashboard is intentionally ready for future expansion.
-Later, middlegame and endgame study can plug into the same shell cleanly.
+What it includes:
 
-## Move Editor
+- saved extracted positions
+- board view for the stored FEN
+- human question / lesson editor
+- linked source game
+- linked opening
+- linked repair navigation
 
-Use `editor.html` to build or clean the tree.
+### `training.html`
+Board-first trainer for the opening tree.
 
-You can:
+What it does:
 
-- create a new root line
-- add child moves
-- edit move SAN
-- add a title
-- add an explanation
-- add tags
-- mark a move as preferred
-- mark a move as do not train
-- delete a move and its subtree
-- import a backup
-- export safety table snapshots
-- split compound moves
+- choose color
+- choose root
+- hear the opponent reply
+- enter the repertoire move
+- reveal answer
+- reveal explanation
+- continue the line or jump to the next branch
 
-### Move Flags
+### `repair.html`
+Repair loop workspace.
 
-Each move has two important training flags:
+What it does:
 
-- `Preferred repertoire move`
-  If a position has multiple candidate child moves, preferred moves are treated as the accepted training answers.
+- stores mistake / lesson / repair
+- keeps repair items open until solved
+- anchors repairs to a move or path
+- now accepts a linked repair coming from Position Vault navigation
 
-- `Do not use for training`
-  The move stays in the tree, but the trainer will skip it.
+### `login.html`
+Owner-only Google login.
 
-Training is now opt-out.
-If a move is not marked `Do not use for training`, it is eligible.
+## New Sprint Added
 
-## Live Board
+This build implements the spec sprint:
 
-The live board inside `editor.html` still shows the selected position and now stays paired with the move editor workflow.
+`Personal Game Analysis + Position/Mistake Extraction`
 
-It shows:
+Included:
 
-- current move
-- move type
-- position status
-- move explanation
-- the full board line
-
-This is the main board view for editing and understanding the tree.
-
-## Training Mode
-
-`training.html` is now the main drilling workflow.
-
-### Training Flow
-
-1. Choose the color to train.
-2. Choose the opening or study root.
-3. Click `Start line`.
-4. See the board position.
-5. If the line already advanced, see the opponent response.
-6. Type your move in SAN.
-7. Get marked.
-8. Choose what to do next:
-   - reveal the answer
-   - ask why
-   - continue the line
-   - jump to the next line
-
-### What Counts As Correct
-
-- If only one eligible move exists, that move is the answer.
-- If several eligible child moves exist and one or more are marked preferred, any preferred move counts as correct.
-- If a move exists in the tree but is marked `Do not use for training`, the trainer tells you that explicitly.
-- If a move exists in the tree but is not the active answer for the current training branch, the trainer marks it as a tree branch, not as the accepted answer.
-
-### What `Wanna know why?` Does
-
-The `Wanna know why?` button reveals the explanation tied to the latest opponent reply when one exists.
-
-If the line is still at the root, it reveals the explanation for the selected study root instead.
-
-### What `Reveal answer` Does
-
-`Reveal answer` shows the accepted answer move or moves and their explanations.
-
-This is the replacement for the old random-card reveal flow.
-
-### What `Next line` Does
-
-`Next line` starts a fresh branch from the same selected root.
-
-This is how the old quick-review randomness now lives inside training mode instead of on a separate page.
-
-### Black Root Note
-
-If your black repertoire roots are stored as root moves like `1...e5`, the trainer treats that as a black-side starting anchor.
-
-That means:
-
-- the trainer can still drill the line correctly
-- the board can start with black to move for that root
-- once the line advances, opponent replies and your responses continue normally
-
-## Repair Loop
-
-`repair.html` is for mistake-to-lesson-to-repair tracking.
-
-Each repair item stores:
-
-- linked move or linked path
-- mistake
-- lesson
-- repair action
-- status
-
-Status values:
-
-- `needs_work`
-- `solved`
-
-Typical use:
-
-1. Select a move in the editor.
-2. Open repair loop.
-3. Link the current move.
-4. Save:
-   - the mistake
-   - the lesson
-   - the repair
-5. Keep it open until it is truly solved.
-
-Example:
-
-- Mistake: `Allowed ...d5 break in the Italian`
-- Lesson: `Need c3 before d4`
-- Repair: `Review three model games and drill the move order`
-
-## Data Safety
-
-This build now treats data safety as a first-class feature.
-
-### Entry Backup Prompt
-
-When you enter the protected app, it now prompts you to export both tables:
-
-- opening nodes
-- repair items
-
-The prompt appears once per app session.
-
-### Export Buttons
-
-The editor now exports table snapshots instead of only a single generic backup button.
-
-Current export flow produces:
-
-- `gm-opening-tree-opening-nodes.json`
-- `gm-opening-tree-repair-items.json`
-
-### Save Confirmation
-
-After save actions, the app now shows a success popup/toast so you can see that the action actually landed.
-
-Examples:
-
-- move saved
-- repair saved
-- child move added
-- repair marked solved
-- move deleted
-
-### Destructive Sync Protection
-
-The app now avoids dangerous wipe behavior:
-
-- non-empty remote data is not replaced by an empty payload unless the action is an explicit delete path
-- parent-child order is validated before syncing
-- failed remote syncs keep the local recovery copy
-- remote emptiness no longer blindly overwrites local non-empty data
+1. `games.html`
+2. PGN paste/import
+3. board replay
+4. move list
+5. move-level human notes
+6. critical moment marker
+7. create position card from current move
+8. create mistake from current move
+9. create repair from current move
+10. opening-tree link attempt
+11. offline save + later sync
+12. backup export for the new data
+
+## Data Model
+
+The app now uses these logical collections:
+
+1. `opening_nodes`
+2. `repair_items`
+3. `games`
+4. `game_annotations`
+5. `positions`
+6. `mistakes`
+
+All six collections use the same protection pattern in `js/db.js`:
+
+- current local copy
+- non-empty recovery snapshot
+- pending-sync copy
+- remote sync when available
+- refusal to wipe non-empty data with accidental empty payloads
+
+## Backup Behavior
+
+The app now supports:
+
+- full backup JSON: `gm-brain-full-backup.json`
+- table snapshots for:
+  - opening nodes
+  - repair items
+  - games
+  - game annotations
+  - positions
+  - mistakes
+
+### Entry Safety Prompt
+
+When a protected page loads, the app prompts once per session to export:
+
+- a full restore backup
+- all current table snapshots
+
+This is deliberate.
+The app is treating your chess data like serious study material, not disposable UI state.
 
 ## Offline Behavior
 
-The app can now keep working offline provided you have not logged out.
+If you already have a valid session and do not log out, the app can keep working offline.
 
-### What Offline Means Here
+What works offline now:
 
-- your existing auth session is checked locally
-- protected pages can still open from the saved session
-- local assets are cached by the service worker
-- Supabase load failures fall back to local data
-- save actions continue locally when the network is unavailable
+- protected page access from stored session
+- move editing
+- training from local data
+- repair editing
+- game import and local analysis
+- position-vault editing
+- backup export
 
-### Important Offline Rule
+What waits for later:
 
-Do not log out if you want to keep using the installed app offline.
+- remote Supabase sync, obviously
 
-If you log out, the local session is intentionally cleared and the app will require login again.
+When sync fails:
 
-## Import And Backup Formats
+- the local copy is kept
+- the recovery snapshot is kept
+- pending changes are preserved for the next sync
 
-### Table Snapshot: Opening Nodes
+## Required SQL Step
 
-Exports now look like this:
-
-```json
-{
-  "table": "opening_nodes",
-  "exported_at": "2026-06-05T00:00:00.000Z",
-  "count": 12,
-  "rows": []
-}
-```
-
-### Table Snapshot: Repair Items
-
-```json
-{
-  "table": "repair_items",
-  "exported_at": "2026-06-05T00:00:00.000Z",
-  "count": 3,
-  "rows": []
-}
-```
-
-### Import Support
-
-The import flow now supports:
-
-- older combined backups with:
-  - `nodes`
-  - `repairs`
-- older node-only backups
-- single-table snapshot files for:
-  - `opening_nodes`
-  - `repair_items`
-
-When you import a single-table snapshot:
-
-- the imported table is replaced from the file
-- the other in-memory table is preserved
-
-## File Map
-
-- `index.html`
-  Dashboard shell.
-
-- `editor.html`
-  Editor shell.
-
-- `training.html`
-  Sequential trainer shell.
-
-- `repair.html`
-  Repair shell.
-
-- `login.html`
-  Auth shell.
-
-- `random.html`
-  Legacy redirect to training.
-
-- `styles.css`
-  Shared design system and layout styles.
-
-- `js/app.js`
-  Shared protected-page controller.
-  Runs dashboard, editor, training, repair, export prompt, and toast feedback.
-
-- `js/db.js`
-  Local-first data layer with guarded Supabase sync behavior.
-
-- `js/auth/login.js`
-  Login page logic.
-
-- `js/auth/only-me-guard.js`
-  Protected-page auth gate.
-
-- `js/config/supabase.js`
-  Shared Supabase client setup using the locally bundled browser runtime.
-
-- `js/ui-shell.js`
-  Theme and logout helpers.
-
-- `js/board-tools.js`
-  Chess board rendering and SAN handling helpers.
-
-- `service-worker.js`
-  Offline asset cache.
-
-- `vendor/supabase-js.min.js`
-  Local browser copy of Supabase JS for offline use.
-
-- `vendor/chess.min.js`
-  Local browser copy of `chess.js` for offline use.
+After pulling this build, run:
 
 - `supabase/schema.sql`
-  Database schema.
 
-## SQL / Schema Note
+in the Supabase SQL Editor.
 
-No new SQL migration is required for this specific update if you already ran the latest schema from the previous version.
+This adds:
 
-This build changed:
+- `games`
+- `game_annotations`
+- `positions`
+- `mistakes`
 
-- UI flow
-- offline behavior
-- sync safety
-- export format
+plus indexes and open solo-use policies.
 
-It did not add new database tables or new required columns.
+If you skip this step, the app still keeps working locally, but the new modules will remain local-only until the tables exist remotely.
 
-## Setup
+## Import Behavior
 
-### 1. Supabase
+The existing backup importer on `editor.html` now understands:
 
-Make sure your existing project already has the tables from `supabase/schema.sql`.
+- old node-only arrays
+- old combined node/repair backups
+- single-table snapshots
+- the new combined full backup format with all six collections
 
-### 2. Config
+## Typical Flow Now
 
-The app reads:
+### Opening work
 
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `TABLE_NAME`
-- `REPAIR_TABLE_NAME`
+1. Build or edit moves in `editor.html`
+2. Train them in `training.html`
+3. Store recurring leaks in `repair.html`
 
-from `js/config.js`.
+### Personal game work
 
-### 3. GitHub Pages
+1. Import PGN in `games.html`
+2. Replay the game manually
+3. Mark critical moments
+4. Save move-by-move notes
+5. Extract a position
+6. Extract a mistake
+7. Create a repair
+8. Review the extracted position later in `positions.html`
 
-1. Push the repo to GitHub.
-2. Enable GitHub Pages from the `main` branch root.
-3. Open the deployed URL.
+## Files To Know
 
-### 4. Install As App
+- `js/app.js`
+  Shared dashboard/editor/training/repair logic and backup prompt logic
 
-Because this is a static web app with a service worker, you can install it from the browser as a PWA.
+- `js/games.js`
+  Game Analysis Studio logic
 
-For best results:
+- `js/positions.js`
+  Position Vault logic
 
-- open it once while online
-- let the assets cache
-- keep your session signed in
-- export safety snapshots regularly
+- `js/chess-brain-utils.js`
+  Shared helpers for PGN parsing, board rendering, and UI helpers used by the new modules
 
-## Recommended Habit
+- `js/db.js`
+  Local-first + Supabase sync layer for all collections
 
-Before a serious editing session:
+- `supabase/schema.sql`
+  Required migration script for the new tables
 
-1. Open the app.
-2. Export both tables.
-3. Edit or train.
-4. Export again after major changes.
+- `CURRENT_APP_STATE.txt`
+  Practical snapshot of what the app currently does right now
 
-That gives you a clean before/after safety trail even if the network or sync layer misbehaves later.
+## Next Obvious Expansion Lanes
+
+The app shell is now ready to grow into:
+
+- middlegame concept vault
+- endgame lab
+- model game library
+- broader mistake analytics
+
+without having to redesign the whole navigation again.

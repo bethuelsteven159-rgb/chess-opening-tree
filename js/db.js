@@ -1,12 +1,59 @@
 const LEGACY_NODE_STORAGE_KEY = "gm_opening_tree_local_v1";
 const NODE_STORAGE_KEY = "gm_opening_tree_local_v2";
 const REPAIR_STORAGE_KEY = "gm_opening_tree_repairs_v1";
+const GAME_STORAGE_KEY = "gm_opening_tree_games_v1";
+const GAME_ANNOTATION_STORAGE_KEY = "gm_opening_tree_game_annotations_v1";
+const POSITION_STORAGE_KEY = "gm_opening_tree_positions_v1";
+const MISTAKE_STORAGE_KEY = "gm_opening_tree_mistakes_v1";
 const NODE_SNAPSHOT_KEY = "gm_opening_tree_local_snapshot_v1";
 const REPAIR_SNAPSHOT_KEY = "gm_opening_tree_repairs_snapshot_v1";
+const GAME_SNAPSHOT_KEY = "gm_opening_tree_games_snapshot_v1";
+const GAME_ANNOTATION_SNAPSHOT_KEY = "gm_opening_tree_game_annotations_snapshot_v1";
+const POSITION_SNAPSHOT_KEY = "gm_opening_tree_positions_snapshot_v1";
+const MISTAKE_SNAPSHOT_KEY = "gm_opening_tree_mistakes_snapshot_v1";
 const PENDING_NODE_SYNC_KEY = "gm_opening_tree_nodes_pending_sync_v1";
 const PENDING_REPAIR_SYNC_KEY = "gm_opening_tree_repairs_pending_sync_v1";
+const PENDING_GAME_SYNC_KEY = "gm_opening_tree_games_pending_sync_v1";
+const PENDING_GAME_ANNOTATION_SYNC_KEY = "gm_opening_tree_game_annotations_pending_sync_v1";
+const PENDING_POSITION_SYNC_KEY = "gm_opening_tree_positions_pending_sync_v1";
+const PENDING_MISTAKE_SYNC_KEY = "gm_opening_tree_mistakes_pending_sync_v1";
 
 const supportCache = new Map();
+
+const GAME_STATUS_VALUES = [
+  "imported_only",
+  "quick_classified",
+  "human_analysis_started",
+  "human_analysis_complete",
+  "engine_checked_later",
+  "lessons_extracted",
+  "repairs_created"
+];
+
+const POSITION_TYPE_VALUES = [
+  "opening",
+  "middlegame",
+  "endgame",
+  "tactic",
+  "defense",
+  "conversion",
+  "strategy"
+];
+
+const MISTAKE_CATEGORY_VALUES = [
+  "opening",
+  "calculation",
+  "tactics",
+  "strategy",
+  "endgame",
+  "time_management",
+  "psychology_emotion",
+  "conversion",
+  "defense"
+];
+
+const MISTAKE_SEVERITY_VALUES = ["small", "medium", "serious", "game_losing"];
+const GAME_PHASE_VALUES = ["opening", "middlegame", "endgame"];
 
 const seedNodes = [
   {
@@ -149,6 +196,131 @@ function normalizeRepairItem(item) {
   };
 }
 
+function normalizeChoice(value, allowed, fallback = "") {
+  return allowed.includes(value) ? value : fallback;
+}
+
+function normalizeGame(game) {
+  return {
+    id: game.id || crypto.randomUUID(),
+    event: String(game.event || "").trim(),
+    site: String(game.site || "").trim(),
+    date: String(game.date || "").trim(),
+    round: String(game.round || "").trim(),
+    time_control: String(game.time_control || "").trim(),
+    platform: String(game.platform || "").trim(),
+    user_color: normalizeChoice(String(game.user_color || "").toLowerCase(), ["white", "black"], "white"),
+    white_player: String(game.white_player || game.white || "").trim(),
+    black_player: String(game.black_player || game.black || "").trim(),
+    result: String(game.result || "*").trim() || "*",
+    opening_name: String(game.opening_name || "").trim(),
+    eco: String(game.eco || "").trim(),
+    pgn: String(game.pgn || "").trim(),
+    final_fen: String(game.final_fen || "").trim(),
+    summary: String(game.summary || "").trim(),
+    tags: normalizeTags(game.tags),
+    analysis_status: normalizeChoice(game.analysis_status, GAME_STATUS_VALUES, "imported_only"),
+    linked_opening_node_id: game.linked_opening_node_id || null,
+    linked_opening_title: String(game.linked_opening_title || "").trim(),
+    created_at: game.created_at || new Date().toISOString(),
+    updated_at: game.updated_at || new Date().toISOString()
+  };
+}
+
+function normalizeGameAnnotation(annotation) {
+  const parsedPly = Number.parseInt(annotation.ply, 10);
+  const parsedMoveNumber = Number.parseInt(annotation.move_number, 10);
+
+  return {
+    id: annotation.id || crypto.randomUUID(),
+    game_id: annotation.game_id || null,
+    move_number: Number.isFinite(parsedMoveNumber) && parsedMoveNumber > 0 ? parsedMoveNumber : null,
+    ply: Number.isFinite(parsedPly) && parsedPly >= 0 ? parsedPly : 0,
+    san: String(annotation.san || "").trim(),
+    from_square: String(annotation.from_square || annotation.from || "").trim(),
+    to_square: String(annotation.to_square || annotation.to || "").trim(),
+    fen_before: String(annotation.fen_before || "").trim(),
+    fen_after: String(annotation.fen_after || "").trim(),
+    human_comment_before: String(annotation.human_comment_before || "").trim(),
+    human_comment_after: String(annotation.human_comment_after || "").trim(),
+    candidate_moves: normalizeTags(annotation.candidate_moves),
+    rejected_candidate_moves: normalizeTags(annotation.rejected_candidate_moves),
+    expected_reply: String(annotation.expected_reply || "").trim(),
+    actual_reply: String(annotation.actual_reply || "").trim(),
+    evaluation_human: String(annotation.evaluation_human || "").trim(),
+    confidence_level: String(annotation.confidence_level || "").trim(),
+    emotional_state: String(annotation.emotional_state || "").trim(),
+    is_critical: annotation.is_critical === true,
+    critical_type: String(annotation.critical_type || "").trim(),
+    mistake_flag: annotation.mistake_flag === true,
+    lesson_flag: annotation.lesson_flag === true,
+    position_id: annotation.position_id || null,
+    mistake_id: annotation.mistake_id || null,
+    repair_id: annotation.repair_id || null,
+    created_at: annotation.created_at || new Date().toISOString(),
+    updated_at: annotation.updated_at || new Date().toISOString()
+  };
+}
+
+function normalizePosition(position) {
+  const parsedMoveNumber = Number.parseInt(position.move_number, 10);
+
+  return {
+    id: position.id || crypto.randomUUID(),
+    fen: String(position.fen || "").trim(),
+    pgn_context: String(position.pgn_context || "").trim(),
+    side_to_move: normalizeChoice(position.side_to_move, ["w", "b"], "w"),
+    move_number: Number.isFinite(parsedMoveNumber) && parsedMoveNumber > 0 ? parsedMoveNumber : null,
+    source_type: String(position.source_type || "").trim(),
+    source_id: position.source_id || null,
+    title: String(position.title || "").trim(),
+    short_question: String(position.short_question || "").trim(),
+    position_type: normalizeChoice(position.position_type, POSITION_TYPE_VALUES, "middlegame"),
+    themes: normalizeTags(position.themes),
+    tags: normalizeTags(position.tags),
+    difficulty: String(position.difficulty || "").trim(),
+    priority: String(position.priority || "").trim(),
+    human_evaluation: String(position.human_evaluation || "").trim(),
+    correct_idea: String(position.correct_idea || "").trim(),
+    wrong_idea: String(position.wrong_idea || "").trim(),
+    candidate_moves: normalizeTags(position.candidate_moves),
+    best_human_move: String(position.best_human_move || "").trim(),
+    lesson: String(position.lesson || "").trim(),
+    linked_repair_id: position.linked_repair_id || null,
+    linked_opening_node_id: position.linked_opening_node_id || null,
+    linked_game_id: position.linked_game_id || null,
+    created_at: position.created_at || new Date().toISOString(),
+    updated_at: position.updated_at || new Date().toISOString()
+  };
+}
+
+function normalizeMistake(mistake) {
+  const parsedMoveNumber = Number.parseInt(mistake.move_number, 10);
+
+  return {
+    id: mistake.id || crypto.randomUUID(),
+    title: String(mistake.title || "").trim(),
+    source_type: String(mistake.source_type || "").trim(),
+    source_id: mistake.source_id || null,
+    position_id: mistake.position_id || null,
+    linked_opening_node_id: mistake.linked_opening_node_id || null,
+    move_number: Number.isFinite(parsedMoveNumber) && parsedMoveNumber > 0 ? parsedMoveNumber : null,
+    category: normalizeChoice(mistake.category, MISTAKE_CATEGORY_VALUES, "calculation"),
+    cause: String(mistake.cause || "").trim(),
+    severity: normalizeChoice(mistake.severity, MISTAKE_SEVERITY_VALUES, "medium"),
+    phase: normalizeChoice(mistake.phase, GAME_PHASE_VALUES, "middlegame"),
+    side: normalizeChoice(String(mistake.side || "").toLowerCase(), ["white", "black"], "white"),
+    what_i_played: String(mistake.what_i_played || "").trim(),
+    what_i_missed: String(mistake.what_i_missed || "").trim(),
+    why_it_happened: String(mistake.why_it_happened || "").trim(),
+    correct_thinking_rule: String(mistake.correct_thinking_rule || "").trim(),
+    recurrence_key: String(mistake.recurrence_key || "").trim(),
+    tags: normalizeTags(mistake.tags),
+    created_at: mistake.created_at || new Date().toISOString(),
+    updated_at: mistake.updated_at || new Date().toISOString()
+  };
+}
+
 function readLocalJson(key) {
   const raw = localStorage.getItem(key);
   return raw ? JSON.parse(raw) : null;
@@ -187,12 +359,51 @@ function storeCurrentRepairs(items) {
   writeNonEmptySnapshot(REPAIR_SNAPSHOT_KEY, items);
 }
 
+function storeCurrentFlatCollection(storageKey, snapshotKey, items) {
+  writeLocalJson(storageKey, items);
+  writeNonEmptySnapshot(snapshotKey, items);
+}
+
+function loadLocalFlatCollection(storageKey, snapshotKey, normalizer, fallback = []) {
+  if (hasLocalJson(storageKey)) {
+    const clean = readStoredArray(storageKey, normalizer);
+    storeCurrentFlatCollection(storageKey, snapshotKey, clean);
+    return clean;
+  }
+
+  const snapshot = readStoredArray(snapshotKey, normalizer);
+  if (snapshot.length) {
+    storeCurrentFlatCollection(storageKey, snapshotKey, snapshot);
+    return snapshot;
+  }
+
+  const clean = fallback.map(normalizer);
+  storeCurrentFlatCollection(storageKey, snapshotKey, clean);
+  return clean;
+}
+
 function loadPendingNodes() {
   return readStoredArray(PENDING_NODE_SYNC_KEY, normalizeNode);
 }
 
 function loadPendingRepairs() {
   return readStoredArray(PENDING_REPAIR_SYNC_KEY, normalizeRepairItem);
+}
+
+function loadPendingGames() {
+  return readStoredArray(PENDING_GAME_SYNC_KEY, normalizeGame);
+}
+
+function loadPendingGameAnnotations() {
+  return readStoredArray(PENDING_GAME_ANNOTATION_SYNC_KEY, normalizeGameAnnotation);
+}
+
+function loadPendingPositions() {
+  return readStoredArray(PENDING_POSITION_SYNC_KEY, normalizePosition);
+}
+
+function loadPendingMistakes() {
+  return readStoredArray(PENDING_MISTAKE_SYNC_KEY, normalizeMistake);
 }
 
 function hasPendingNodes() {
@@ -203,6 +414,22 @@ function hasPendingRepairs() {
   return hasLocalJson(PENDING_REPAIR_SYNC_KEY);
 }
 
+function hasPendingGames() {
+  return hasLocalJson(PENDING_GAME_SYNC_KEY);
+}
+
+function hasPendingGameAnnotations() {
+  return hasLocalJson(PENDING_GAME_ANNOTATION_SYNC_KEY);
+}
+
+function hasPendingPositions() {
+  return hasLocalJson(PENDING_POSITION_SYNC_KEY);
+}
+
+function hasPendingMistakes() {
+  return hasLocalJson(PENDING_MISTAKE_SYNC_KEY);
+}
+
 function markPendingNodes(nodes) {
   writeLocalJson(PENDING_NODE_SYNC_KEY, nodes);
 }
@@ -211,12 +438,44 @@ function markPendingRepairs(items) {
   writeLocalJson(PENDING_REPAIR_SYNC_KEY, items);
 }
 
+function markPendingGames(items) {
+  writeLocalJson(PENDING_GAME_SYNC_KEY, items);
+}
+
+function markPendingGameAnnotations(items) {
+  writeLocalJson(PENDING_GAME_ANNOTATION_SYNC_KEY, items);
+}
+
+function markPendingPositions(items) {
+  writeLocalJson(PENDING_POSITION_SYNC_KEY, items);
+}
+
+function markPendingMistakes(items) {
+  writeLocalJson(PENDING_MISTAKE_SYNC_KEY, items);
+}
+
 function clearPendingNodes() {
   clearLocalJson(PENDING_NODE_SYNC_KEY);
 }
 
 function clearPendingRepairs() {
   clearLocalJson(PENDING_REPAIR_SYNC_KEY);
+}
+
+function clearPendingGames() {
+  clearLocalJson(PENDING_GAME_SYNC_KEY);
+}
+
+function clearPendingGameAnnotations() {
+  clearLocalJson(PENDING_GAME_ANNOTATION_SYNC_KEY);
+}
+
+function clearPendingPositions() {
+  clearLocalJson(PENDING_POSITION_SYNC_KEY);
+}
+
+function clearPendingMistakes() {
+  clearLocalJson(PENDING_MISTAKE_SYNC_KEY);
 }
 
 function loadLocalNodes() {
@@ -259,6 +518,38 @@ function loadLocalRepairs() {
   const clean = [];
   storeCurrentRepairs(clean);
   return clean;
+}
+
+function storeCurrentGames(items) {
+  storeCurrentFlatCollection(GAME_STORAGE_KEY, GAME_SNAPSHOT_KEY, items);
+}
+
+function storeCurrentGameAnnotations(items) {
+  storeCurrentFlatCollection(GAME_ANNOTATION_STORAGE_KEY, GAME_ANNOTATION_SNAPSHOT_KEY, items);
+}
+
+function storeCurrentPositions(items) {
+  storeCurrentFlatCollection(POSITION_STORAGE_KEY, POSITION_SNAPSHOT_KEY, items);
+}
+
+function storeCurrentMistakes(items) {
+  storeCurrentFlatCollection(MISTAKE_STORAGE_KEY, MISTAKE_SNAPSHOT_KEY, items);
+}
+
+function loadLocalGames() {
+  return loadLocalFlatCollection(GAME_STORAGE_KEY, GAME_SNAPSHOT_KEY, normalizeGame, []);
+}
+
+function loadLocalGameAnnotations() {
+  return loadLocalFlatCollection(GAME_ANNOTATION_STORAGE_KEY, GAME_ANNOTATION_SNAPSHOT_KEY, normalizeGameAnnotation, []);
+}
+
+function loadLocalPositions() {
+  return loadLocalFlatCollection(POSITION_STORAGE_KEY, POSITION_SNAPSHOT_KEY, normalizePosition, []);
+}
+
+function loadLocalMistakes() {
+  return loadLocalFlatCollection(MISTAKE_STORAGE_KEY, MISTAKE_SNAPSHOT_KEY, normalizeMistake, []);
 }
 
 function describeError(error) {
@@ -401,7 +692,7 @@ function stripUnsupportedNodeFields(node, support) {
   return row;
 }
 
-async function repairTableAvailable(client, table) {
+async function flatTableAvailable(client, table, label) {
   const cacheKey = `table:${table}`;
   if (supportCache.has(cacheKey)) return supportCache.get(cacheKey);
 
@@ -413,12 +704,16 @@ async function repairTableAvailable(client, table) {
   }
 
   if (isMissingTableError(error, table)) {
-    console.warn(`Supabase table ${table} does not exist yet. Repairs will stay in localStorage until you run the updated supabase/schema.sql.`);
+    console.warn(`Supabase table ${table} does not exist yet. ${label} will stay in localStorage until you run the updated supabase/schema.sql.`);
     supportCache.set(cacheKey, false);
     return false;
   }
 
   throw error;
+}
+
+async function repairTableAvailable(client, table) {
+  return flatTableAvailable(client, table, "Repairs");
 }
 
 async function loadNodesFromRemote(client, table) {
@@ -447,6 +742,63 @@ async function loadRepairItemsFromRemote(client, table) {
   }
 
   return (data || []).map(normalizeRepairItem);
+}
+
+async function loadGamesFromRemote(client, table) {
+  const { data, error } = await client
+    .from(table)
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Supabase game load failed:", error);
+    throw error;
+  }
+
+  return (data || []).map(normalizeGame);
+}
+
+async function loadGameAnnotationsFromRemote(client, table) {
+  const { data, error } = await client
+    .from(table)
+    .select("*")
+    .order("game_id", { ascending: true })
+    .order("ply", { ascending: true });
+
+  if (error) {
+    console.error("Supabase annotation load failed:", error);
+    throw error;
+  }
+
+  return (data || []).map(normalizeGameAnnotation);
+}
+
+async function loadPositionsFromRemote(client, table) {
+  const { data, error } = await client
+    .from(table)
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Supabase position load failed:", error);
+    throw error;
+  }
+
+  return (data || []).map(normalizePosition);
+}
+
+async function loadMistakesFromRemote(client, table) {
+  const { data, error } = await client
+    .from(table)
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Supabase mistake load failed:", error);
+    throw error;
+  }
+
+  return (data || []).map(normalizeMistake);
 }
 
 async function syncNodesToRemote(client, table, clean, options = {}) {
@@ -512,6 +864,40 @@ async function syncRepairItemsToRemote(client, table, clean, options = {}) {
 
     if (error) {
       console.error("Supabase repair delete failed:", error);
+      throw error;
+    }
+  }
+}
+
+async function syncFlatRowsToRemote(client, table, clean, label, remoteLoader, options = {}) {
+  const { allowEmpty = false } = options;
+  const remoteItems = await remoteLoader(client, table);
+
+  if (!allowEmpty && !clean.length && remoteItems.length) {
+    throw new Error(`Refusing to replace a non-empty ${label} with an empty save payload.`);
+  }
+
+  ensureUniqueIds(clean, label);
+
+  for (const item of clean) {
+    const { error } = await client.from(table).upsert(item, { onConflict: "id" });
+
+    if (error) {
+      console.error(`Supabase ${label} upsert failed:`, error);
+      throw error;
+    }
+  }
+
+  const keepIds = new Set(clean.map(item => item.id));
+  const removeIds = remoteItems
+    .filter(item => !keepIds.has(item.id))
+    .map(item => item.id);
+
+  if (removeIds.length) {
+    const { error } = await client.from(table).delete().in("id", removeIds);
+
+    if (error) {
+      console.error(`Supabase ${label} delete failed:`, error);
       throw error;
     }
   }
@@ -787,6 +1173,380 @@ async function deleteRepairItem(id) {
   return kept;
 }
 
+async function loadRemoteBackedFlatCollection(options) {
+  const {
+    label,
+    table,
+    remoteLoader,
+    loadLocal,
+    loadPending,
+    hasPending,
+    storeCurrent,
+    clearPending
+  } = options;
+  const localItems = loadLocal();
+  const pendingItems = loadPending();
+  const pendingItemsExist = hasPending();
+  const client = getClient();
+  let tableReady = false;
+
+  if (client) {
+    try {
+      tableReady = await flatTableAvailable(client, table, label);
+    } catch (error) {
+      if (isConnectivityError(error)) {
+        console.warn(`${label} table check is unavailable. Using the local copy instead.`, error);
+        if (pendingItemsExist) {
+          storeCurrent(pendingItems);
+          return pendingItems;
+        }
+
+        return localItems;
+      }
+
+      throw error;
+    }
+  }
+
+  if (!client || !tableReady) {
+    if (pendingItemsExist) {
+      storeCurrent(pendingItems);
+      return pendingItems;
+    }
+
+    return localItems;
+  }
+
+  let remoteItems;
+  try {
+    remoteItems = await remoteLoader(client, table);
+  } catch (error) {
+    if (isConnectivityError(error)) {
+      console.warn(`${label} remote load is unavailable. Using the local copy instead.`, error);
+      if (pendingItemsExist) {
+        storeCurrent(pendingItems);
+        return pendingItems;
+      }
+
+      return localItems;
+    }
+
+    throw error;
+  }
+
+  if (pendingItemsExist && !rowsMatchExactly(remoteItems, pendingItems)) {
+    console.warn(`Remote ${label.toLowerCase()} does not match the pending local sync. Preserving the local recovery copy instead of overwriting it.`);
+    storeCurrent(pendingItems);
+    return pendingItems;
+  }
+
+  if (!remoteItems.length && localItems.length) {
+    console.warn(`Remote ${label.toLowerCase()} is empty while local data still exists. Preserving the local copy instead of overwriting it.`);
+    return localItems;
+  }
+
+  storeCurrent(remoteItems);
+  clearPending();
+  return remoteItems;
+}
+
+async function saveRemoteBackedFlatCollection(items, options) {
+  const {
+    allowEmpty = false,
+    label,
+    table,
+    remoteLoader,
+    loadLocal,
+    storeCurrent,
+    markPending,
+    clearPending,
+    normalizer
+  } = options;
+  const clean = items.map(normalizer);
+  const client = getClient();
+  let tableReady = false;
+
+  if (!allowEmpty && !clean.length) {
+    if (client) {
+      tableReady = await flatTableAvailable(client, table, label);
+    }
+
+    if (client && tableReady) {
+      const remoteItems = await remoteLoader(client, table);
+      if (remoteItems.length) {
+        throw new Error(`Refusing to replace a non-empty ${label.toLowerCase()} with an empty bulk save.`);
+      }
+    } else if (loadLocal().length) {
+      throw new Error(`Refusing to replace a non-empty local ${label.toLowerCase()} with an empty bulk save.`);
+    }
+  }
+
+  storeCurrent(clean);
+  markPending(clean);
+
+  if (client && !tableReady) {
+    try {
+      tableReady = await flatTableAvailable(client, table, label);
+    } catch (error) {
+      if (isConnectivityError(error)) {
+        console.warn(`${label} table check is unavailable. Keeping the latest save locally until the next sync.`, error);
+        return clean;
+      }
+
+      throw error;
+    }
+  }
+
+  if (!client || !tableReady) {
+    return clean;
+  }
+
+  try {
+    await syncFlatRowsToRemote(client, table, clean, label.toLowerCase(), remoteLoader, { allowEmpty });
+    storeCurrent(clean);
+    clearPending();
+  } catch (error) {
+    if (isConnectivityError(error)) {
+      console.warn(`${label} sync is unavailable. Keeping the latest save locally until the next sync.`, error);
+      return clean;
+    }
+
+    throw error;
+  }
+
+  return clean;
+}
+
+async function loadGames() {
+  return loadRemoteBackedFlatCollection({
+    label: "Games",
+    table: window.APP_CONFIG?.GAMES_TABLE_NAME || "games",
+    remoteLoader: loadGamesFromRemote,
+    loadLocal: loadLocalGames,
+    loadPending: loadPendingGames,
+    hasPending: hasPendingGames,
+    storeCurrent: storeCurrentGames,
+    clearPending: clearPendingGames
+  });
+}
+
+async function saveAllGames(items, options = {}) {
+  return saveRemoteBackedFlatCollection(items, {
+    ...options,
+    label: "Games",
+    table: window.APP_CONFIG?.GAMES_TABLE_NAME || "games",
+    remoteLoader: loadGamesFromRemote,
+    loadLocal: loadLocalGames,
+    storeCurrent: storeCurrentGames,
+    markPending: markPendingGames,
+    clearPending: clearPendingGames,
+    normalizer: normalizeGame
+  });
+}
+
+async function upsertGame(game) {
+  const games = await loadGames();
+  const clean = normalizeGame(game);
+  const index = games.findIndex(entry => entry.id === clean.id);
+
+  if (index >= 0) games[index] = clean;
+  else games.unshift(clean);
+
+  await saveAllGames(games);
+  return clean;
+}
+
+async function deleteGame(id) {
+  const games = await loadGames();
+  const keptGames = games.filter(entry => entry.id !== id);
+  await saveAllGames(keptGames, { allowEmpty: true });
+
+  const annotations = await loadGameAnnotations();
+  const keptAnnotations = annotations.filter(entry => entry.game_id !== id);
+  await saveAllGameAnnotations(keptAnnotations, { allowEmpty: true });
+
+  const positions = await loadPositions();
+  const updatedPositions = positions.map(position =>
+    position.linked_game_id === id
+      ? { ...position, linked_game_id: null, updated_at: new Date().toISOString() }
+      : position
+  );
+  await saveAllPositions(updatedPositions, { allowEmpty: true });
+
+  return keptGames;
+}
+
+async function loadGameAnnotations() {
+  return loadRemoteBackedFlatCollection({
+    label: "Game annotations",
+    table: window.APP_CONFIG?.GAME_ANNOTATIONS_TABLE_NAME || "game_annotations",
+    remoteLoader: loadGameAnnotationsFromRemote,
+    loadLocal: loadLocalGameAnnotations,
+    loadPending: loadPendingGameAnnotations,
+    hasPending: hasPendingGameAnnotations,
+    storeCurrent: storeCurrentGameAnnotations,
+    clearPending: clearPendingGameAnnotations
+  });
+}
+
+async function saveAllGameAnnotations(items, options = {}) {
+  return saveRemoteBackedFlatCollection(items, {
+    ...options,
+    label: "Game annotations",
+    table: window.APP_CONFIG?.GAME_ANNOTATIONS_TABLE_NAME || "game_annotations",
+    remoteLoader: loadGameAnnotationsFromRemote,
+    loadLocal: loadLocalGameAnnotations,
+    storeCurrent: storeCurrentGameAnnotations,
+    markPending: markPendingGameAnnotations,
+    clearPending: clearPendingGameAnnotations,
+    normalizer: normalizeGameAnnotation
+  });
+}
+
+async function upsertGameAnnotation(annotation) {
+  const annotations = await loadGameAnnotations();
+  const clean = normalizeGameAnnotation(annotation);
+  const index = annotations.findIndex(entry => entry.id === clean.id);
+
+  if (index >= 0) annotations[index] = clean;
+  else annotations.push(clean);
+
+  annotations.sort((left, right) => {
+    if (left.game_id !== right.game_id) {
+      return String(left.game_id || "").localeCompare(String(right.game_id || ""));
+    }
+    return left.ply - right.ply;
+  });
+
+  await saveAllGameAnnotations(annotations);
+  return clean;
+}
+
+async function deleteGameAnnotation(id) {
+  const annotations = await loadGameAnnotations();
+  const kept = annotations.filter(entry => entry.id !== id);
+  await saveAllGameAnnotations(kept, { allowEmpty: true });
+  return kept;
+}
+
+async function loadPositions() {
+  return loadRemoteBackedFlatCollection({
+    label: "Positions",
+    table: window.APP_CONFIG?.POSITIONS_TABLE_NAME || "positions",
+    remoteLoader: loadPositionsFromRemote,
+    loadLocal: loadLocalPositions,
+    loadPending: loadPendingPositions,
+    hasPending: hasPendingPositions,
+    storeCurrent: storeCurrentPositions,
+    clearPending: clearPendingPositions
+  });
+}
+
+async function saveAllPositions(items, options = {}) {
+  return saveRemoteBackedFlatCollection(items, {
+    ...options,
+    label: "Positions",
+    table: window.APP_CONFIG?.POSITIONS_TABLE_NAME || "positions",
+    remoteLoader: loadPositionsFromRemote,
+    loadLocal: loadLocalPositions,
+    storeCurrent: storeCurrentPositions,
+    markPending: markPendingPositions,
+    clearPending: clearPendingPositions,
+    normalizer: normalizePosition
+  });
+}
+
+async function upsertPosition(position) {
+  const positions = await loadPositions();
+  const clean = normalizePosition(position);
+  const index = positions.findIndex(entry => entry.id === clean.id);
+
+  if (index >= 0) positions[index] = clean;
+  else positions.unshift(clean);
+
+  await saveAllPositions(positions);
+  return clean;
+}
+
+async function deletePosition(id) {
+  const positions = await loadPositions();
+  const keptPositions = positions.filter(entry => entry.id !== id);
+  await saveAllPositions(keptPositions, { allowEmpty: true });
+
+  const annotations = await loadGameAnnotations();
+  const updatedAnnotations = annotations.map(annotation =>
+    annotation.position_id === id
+      ? { ...annotation, position_id: null, updated_at: new Date().toISOString() }
+      : annotation
+  );
+  await saveAllGameAnnotations(updatedAnnotations, { allowEmpty: true });
+
+  const mistakes = await loadMistakes();
+  const updatedMistakes = mistakes.map(mistake =>
+    mistake.position_id === id
+      ? { ...mistake, position_id: null, updated_at: new Date().toISOString() }
+      : mistake
+  );
+  await saveAllMistakes(updatedMistakes, { allowEmpty: true });
+
+  return keptPositions;
+}
+
+async function loadMistakes() {
+  return loadRemoteBackedFlatCollection({
+    label: "Mistakes",
+    table: window.APP_CONFIG?.MISTAKES_TABLE_NAME || "mistakes",
+    remoteLoader: loadMistakesFromRemote,
+    loadLocal: loadLocalMistakes,
+    loadPending: loadPendingMistakes,
+    hasPending: hasPendingMistakes,
+    storeCurrent: storeCurrentMistakes,
+    clearPending: clearPendingMistakes
+  });
+}
+
+async function saveAllMistakes(items, options = {}) {
+  return saveRemoteBackedFlatCollection(items, {
+    ...options,
+    label: "Mistakes",
+    table: window.APP_CONFIG?.MISTAKES_TABLE_NAME || "mistakes",
+    remoteLoader: loadMistakesFromRemote,
+    loadLocal: loadLocalMistakes,
+    storeCurrent: storeCurrentMistakes,
+    markPending: markPendingMistakes,
+    clearPending: clearPendingMistakes,
+    normalizer: normalizeMistake
+  });
+}
+
+async function upsertMistake(mistake) {
+  const mistakes = await loadMistakes();
+  const clean = normalizeMistake(mistake);
+  const index = mistakes.findIndex(entry => entry.id === clean.id);
+
+  if (index >= 0) mistakes[index] = clean;
+  else mistakes.unshift(clean);
+
+  await saveAllMistakes(mistakes);
+  return clean;
+}
+
+async function deleteMistake(id) {
+  const mistakes = await loadMistakes();
+  const keptMistakes = mistakes.filter(entry => entry.id !== id);
+  await saveAllMistakes(keptMistakes, { allowEmpty: true });
+
+  const annotations = await loadGameAnnotations();
+  const updatedAnnotations = annotations.map(annotation =>
+    annotation.mistake_id === id
+      ? { ...annotation, mistake_id: null, updated_at: new Date().toISOString() }
+      : annotation
+  );
+  await saveAllGameAnnotations(updatedAnnotations, { allowEmpty: true });
+
+  return keptMistakes;
+}
+
 window.OpeningDB = {
   loadNodes,
   saveAllNodes,
@@ -797,5 +1557,25 @@ window.OpeningDB = {
   saveAllRepairItems,
   upsertRepairItem,
   deleteRepairItem,
-  normalizeRepairItem
+  normalizeRepairItem,
+  loadGames,
+  saveAllGames,
+  upsertGame,
+  deleteGame,
+  normalizeGame,
+  loadGameAnnotations,
+  saveAllGameAnnotations,
+  upsertGameAnnotation,
+  deleteGameAnnotation,
+  normalizeGameAnnotation,
+  loadPositions,
+  saveAllPositions,
+  upsertPosition,
+  deletePosition,
+  normalizePosition,
+  loadMistakes,
+  saveAllMistakes,
+  upsertMistake,
+  deleteMistake,
+  normalizeMistake
 };

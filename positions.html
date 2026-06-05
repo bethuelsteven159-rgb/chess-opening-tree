@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GM Opening Tree - Position Vault</title>
+  <meta name="theme-color" content="#08111d" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
+  </script>
+  <link rel="stylesheet" href="styles.css?v=15" />
+  <script src="vendor/supabase-js.min.js"></script>
+  <script src="vendor/chess.min.js"></script>
+</head>
+<body class="app-page" data-page="positions">
+  <div class="texture-grid"></div>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+
+  <header class="page-shell page-header">
+    <nav class="topbar">
+      <a class="brand brand-link" href="index.html">
+        <span class="logo">&#9823;</span>
+        <div>
+          <h1>GM Opening Tree</h1>
+          <p>Position vault</p>
+        </div>
+      </a>
+
+      <div class="page-nav" aria-label="Primary">
+        <a class="nav-link" href="index.html">Dashboard</a>
+        <a class="nav-link" href="editor.html">Move Editor</a>
+        <a class="nav-link" href="games.html">Games</a>
+        <a class="nav-link is-current" href="positions.html">Positions</a>
+        <a class="nav-link" href="training.html">Training</a>
+        <a class="nav-link" href="repair.html">Repair</a>
+      </div>
+
+      <div class="nav-actions">
+        <button id="themeToggleBtn" class="button button-secondary button-tiny" type="button">Light mode</button>
+        <button id="syncBtn" class="button button-primary button-tiny" type="button">Sync</button>
+        <button id="logoutBtn" class="button button-secondary button-tiny" type="button">Logout</button>
+      </div>
+    </nav>
+
+    <section class="panel page-intro-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Position vault</p>
+          <h2>Keep the important positions even after the game itself is over.</h2>
+          <p class="muted">
+            This is where extracted game moments become durable study assets: searchable positions, human questions, linked repairs, and opening context.
+          </p>
+        </div>
+
+        <div class="page-intro-meta intro-stat-stack">
+          <span id="positionCountPill" class="status-pill">0 positions</span>
+          <span id="positionRepairPill" class="status-pill">0 linked repairs</span>
+        </div>
+      </div>
+    </section>
+  </header>
+
+  <main class="page-shell positions-shell">
+    <aside class="panel position-list-panel">
+      <div class="section-heading">
+        <div>
+          <h3>Vault index</h3>
+          <p class="muted">Filter the saved positions and jump back into the exact board state you wanted to remember.</p>
+        </div>
+      </div>
+
+      <div class="position-filter-grid">
+        <label>
+          Type
+          <select id="positionTypeFilter">
+            <option value="all">All types</option>
+            <option value="opening">Opening</option>
+            <option value="middlegame">Middlegame</option>
+            <option value="endgame">Endgame</option>
+            <option value="tactic">Tactic</option>
+            <option value="defense">Defense</option>
+            <option value="conversion">Conversion</option>
+            <option value="strategy">Strategy</option>
+          </select>
+        </label>
+
+        <label>
+          Search
+          <input id="positionSearchInput" placeholder="Theme, opening, lesson..." />
+        </label>
+      </div>
+
+      <div id="positionList" class="position-list"></div>
+    </aside>
+
+    <div class="position-stack">
+      <section class="panel position-board-panel">
+        <div class="live-board-heading">
+          <div>
+            <p class="eyebrow">Vault board</p>
+            <h3 id="positionBoardTitle">No position selected</h3>
+            <p id="positionBoardSubtitle" class="muted">Choose a saved position to inspect the board, source, and linked lesson.</p>
+          </div>
+          <div id="positionBoardMeta" class="status-pill">Waiting for position</div>
+        </div>
+
+        <div class="live-board-layout">
+          <div class="board-stage">
+            <div class="board-frame">
+              <div id="positionBoard" class="chess-board" role="img" aria-label="Position vault board"></div>
+            </div>
+          </div>
+
+          <div class="board-sidebar">
+            <div class="board-detail-grid board-detail-grid-triple">
+              <article class="board-detail-card">
+                <span class="board-detail-label">Type</span>
+                <strong id="positionTypeValue">Position</strong>
+                <p id="positionTypeCaption">The stored position family will appear here.</p>
+              </article>
+
+              <article class="board-detail-card">
+                <span class="board-detail-label">Source</span>
+                <strong id="positionSourceValue">No source yet</strong>
+                <p id="positionSourceCaption">Game origin and opening link will appear here.</p>
+              </article>
+
+              <article class="board-detail-card">
+                <span class="board-detail-label">Linked work</span>
+                <strong id="positionLinkedValue">No repair yet</strong>
+                <p id="positionLinkedCaption">Mistakes and repairs linked to this position will be summarized here.</p>
+              </article>
+            </div>
+
+            <article class="board-detail-card board-detail-wide">
+              <span class="board-detail-label">Line context</span>
+              <p id="positionContextValue" class="muted">Stored move context will show here when a position is tied to a game or line.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="position-secondary">
+        <section class="panel position-editor-panel">
+          <div class="section-heading">
+            <div>
+              <h3>Position editor</h3>
+              <p id="positionEditorState" class="muted">Select a vault entry to edit the human question, move idea, and lesson.</p>
+            </div>
+
+            <div class="stack-actions">
+              <button id="savePositionBtn" class="button button-primary button-tiny" type="button">Save position</button>
+              <button id="deletePositionBtn" class="button button-danger button-tiny" type="button">Delete position</button>
+            </div>
+          </div>
+
+          <div id="positionLinkBanner" class="repair-link-banner">No position selected yet.</div>
+
+          <div class="position-editor-grid">
+            <label>
+              Title
+              <input id="positionTitleInput" placeholder="Position before 12.Nf3" />
+            </label>
+
+            <label>
+              Short question
+              <input id="positionQuestionInput" placeholder="What is the cleanest plan here?" />
+            </label>
+
+            <label>
+              Position type
+              <select id="positionTypeInput">
+                <option value="opening">Opening</option>
+                <option value="middlegame">Middlegame</option>
+                <option value="endgame">Endgame</option>
+                <option value="tactic">Tactic</option>
+                <option value="defense">Defense</option>
+                <option value="conversion">Conversion</option>
+                <option value="strategy">Strategy</option>
+              </select>
+            </label>
+
+            <label>
+              Themes
+              <input id="positionThemesInput" placeholder="initiative, weak squares, opposite-side castling..." />
+            </label>
+
+            <label>
+              Tags
+              <input id="positionTagsInput" placeholder="Italian, rapid, nerves, endgame..." />
+            </label>
+
+            <label>
+              Human evaluation
+              <input id="positionEvaluationInput" placeholder="Slightly better for White, equal but easier..." />
+            </label>
+
+            <label>
+              Best human move
+              <input id="positionBestMoveInput" placeholder="Nf3, d4, ...Rc8" />
+            </label>
+
+            <label>
+              Correct idea
+              <textarea id="positionCorrectIdeaInput" rows="4" placeholder="What concept or plan should be remembered here?"></textarea>
+            </label>
+
+            <label>
+              Wrong idea
+              <textarea id="positionWrongIdeaInput" rows="4" placeholder="What tempting but wrong plan keeps causing problems?"></textarea>
+            </label>
+
+            <label>
+              Lesson
+              <textarea id="positionLessonInput" rows="5" placeholder="Turn the moment into a reusable lesson, not just a note dump."></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="panel position-links-panel">
+          <div class="section-heading">
+            <div>
+              <h3>Linked modules</h3>
+              <p class="muted">Jump back to the source game, move editor, or repair loop from here.</p>
+            </div>
+          </div>
+
+          <div class="position-link-actions">
+            <button id="openPositionGameBtn" class="button button-secondary" type="button">Open source game</button>
+            <button id="openPositionEditorBtn" class="button button-secondary" type="button">Open linked opening</button>
+            <button id="openPositionRepairBtn" class="button button-secondary" type="button">Open linked repair</button>
+          </div>
+
+          <div id="positionLinksSummary" class="line-block">
+            <div class="line-label">Linked summary</div>
+            <div class="line-strip">
+              <div class="line-empty">No linked position selected yet.</div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </div>
+  </main>
+
+  <footer class="page-shell page-footer">
+    <p>Positions are the memory units. Save the board state, the question, and the lesson while the pain is still fresh.</p>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/db.js"></script>
+  <script type="module" src="./js/positions.js?v=15"></script>
+  <script>
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
+  </script>
+</body>
+</html>

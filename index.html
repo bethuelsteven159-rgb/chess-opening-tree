@@ -12,7 +12,7 @@
   <script>
     document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
   </script>
-  <link rel="stylesheet" href="styles.css?v=13" />
+  <link rel="stylesheet" href="styles.css?v=15" />
   <script src="vendor/supabase-js.min.js"></script>
   <script src="vendor/chess.min.js"></script>
 </head>
@@ -34,8 +34,10 @@
       <div class="page-nav" aria-label="Primary">
         <a class="nav-link is-current" href="index.html">Dashboard</a>
         <a class="nav-link" href="editor.html">Move Editor</a>
+        <a class="nav-link" href="games.html">Games</a>
+        <a class="nav-link" href="positions.html">Positions</a>
         <a class="nav-link" href="training.html">Training</a>
-        <a class="nav-link" href="repair.html">Repair Loop</a>
+        <a class="nav-link" href="repair.html">Repair</a>
       </div>
 
       <div class="nav-actions">
@@ -48,10 +50,9 @@
     <section class="hero-grid">
       <div class="hero-copy">
         <p class="eyebrow">What to do</p>
-        <h2>Pick the study lane that matches the work in front of you.</h2>
+        <h2>Run the app like a chess brain, not just an opening notebook.</h2>
         <p>
-          Keep the workspace modular: build moves in the editor, drill full branches in training mode,
-          and convert real-game pain into focused repair loops.
+          Build lines, analyze real games, extract lasting positions, drill your repertoire, and keep repair work visible until the weakness disappears.
         </p>
       </div>
 
@@ -65,8 +66,16 @@
           <strong id="lineCount">0</strong>
         </article>
         <article class="stat-card">
-          <span>Training positions</span>
-          <strong id="trainerCount">0</strong>
+          <span>Games analyzed</span>
+          <strong id="gameCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Positions saved</span>
+          <strong id="positionCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Mistakes logged</span>
+          <strong id="mistakeCount">0</strong>
         </article>
         <article class="stat-card">
           <span>Repairs due</span>
@@ -83,7 +92,7 @@
           <p class="eyebrow">Study dashboard</p>
           <h3>Choose your next rep</h3>
           <p class="muted">
-            This hub is ready for future middlegame and endgame modules, but for now it keeps your opening work separated into clean pages.
+            The app now splits move building, personal game analysis, extracted positions, training, and repair into separate lanes so later middlegame and endgame modules can fit cleanly too.
           </p>
         </div>
 
@@ -100,6 +109,26 @@
           <div class="study-choice-meta">
             <strong id="dashboardEditorCount">0 moves</strong>
             <span>Explorer, editor, and board</span>
+          </div>
+        </a>
+
+        <a class="study-choice-card" href="games.html">
+          <span class="study-choice-kicker">Game analysis</span>
+          <h4>Replay your own games honestly</h4>
+          <p>Import a PGN, mark the critical moments, write what you thought, and extract reusable study objects from the pain.</p>
+          <div class="study-choice-meta">
+            <strong id="dashboardGamesCount">0 games</strong>
+            <span>Replay board, move notes, extraction tools</span>
+          </div>
+        </a>
+
+        <a class="study-choice-card" href="positions.html">
+          <span class="study-choice-kicker">Position vault</span>
+          <h4>Keep the boards that matter</h4>
+          <p>Save important positions with the human question, best move idea, and linked repair so the lesson survives the game.</p>
+          <div class="study-choice-meta">
+            <strong id="dashboardPositionCount">0 positions</strong>
+            <span>Position cards linked to games and openings</span>
           </div>
         </a>
 
@@ -137,14 +166,36 @@
 
       <article class="panel dashboard-roadmap-panel">
         <p class="eyebrow">Expansion lane</p>
-        <h3>Built for more than openings</h3>
+        <h3>Built for the full GM brain</h3>
         <p class="muted">
-          The dashboard is now separated so later we can plug in middlegame plans, endgame studies, model games, and spaced-repetition review without cramming them into one page.
+          Openings are now only one module. The same shell is ready for model games, middlegame plans, endgame studies, and future review evidence without turning the app into one giant crowded page.
         </p>
         <div class="roadmap-pill-row">
-          <span class="roadmap-pill">Openings now</span>
+          <span class="roadmap-pill">Openings live</span>
+          <span class="roadmap-pill">Game analysis live</span>
+          <span class="roadmap-pill">Positions live</span>
           <span class="roadmap-pill">Middlegames next</span>
           <span class="roadmap-pill">Endgames after</span>
+        </div>
+      </article>
+    </section>
+
+    <section class="dashboard-secondary">
+      <article class="panel dashboard-heatmap-panel">
+        <p class="eyebrow">Weakness heatmap</p>
+        <h3>Repeated patterns</h3>
+        <p class="muted">Mistakes extracted from your games will accumulate here by category so the same leak stops hiding.</p>
+        <div id="dashboardHeatmap" class="heatmap-list">
+          <div class="line-empty">No mistake records yet.</div>
+        </div>
+      </article>
+
+      <article class="panel dashboard-queue-panel">
+        <p class="eyebrow">Games needing work</p>
+        <h3>Unfinished analysis queue</h3>
+        <p class="muted">Imported games stay visible here until the lessons are extracted and the repairs exist.</p>
+        <div id="dashboardGameQueue" class="queue-list">
+          <div class="line-empty">No games in the queue yet.</div>
         </div>
       </article>
     </section>
@@ -156,7 +207,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
-  <script type="module" src="./js/app.js?v=13"></script>
+  <script type="module" src="./js/app.js?v=15"></script>
   <script>
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
   </script>

@@ -19,12 +19,17 @@ if (!window.OpeningDB) {
 }
 
 const SELECTED_NODE_STORAGE_KEY = "gm_opening_tree_selected_node_v1";
+const SELECTED_REPAIR_STORAGE_KEY = "gm_brain_selected_repair_v1";
 const BACKUP_PROMPT_SESSION_KEY = "gm_opening_tree_backup_prompt_seen_v1";
 
 let nodes = [];
 let repairs = [];
+let games = [];
+let gameAnnotations = [];
+let positions = [];
+let mistakes = [];
 let selectedId = loadSelectedNodeId();
-let selectedRepairId = null;
+let selectedRepairId = loadSelectedRepairId();
 let trainingState = {
   color: "w",
   rootId: null,
@@ -54,9 +59,23 @@ function saveSelectedNodeId(id) {
   else localStorage.removeItem(SELECTED_NODE_STORAGE_KEY);
 }
 
+function loadSelectedRepairId() {
+  return localStorage.getItem(SELECTED_REPAIR_STORAGE_KEY) || null;
+}
+
+function saveSelectedRepairId(id) {
+  if (id) localStorage.setItem(SELECTED_REPAIR_STORAGE_KEY, id);
+  else localStorage.removeItem(SELECTED_REPAIR_STORAGE_KEY);
+}
+
 function setSelectedNodeId(id) {
   selectedId = id || null;
   saveSelectedNodeId(selectedId);
+}
+
+function setSelectedRepairId(id) {
+  selectedRepairId = id || null;
+  saveSelectedRepairId(selectedRepairId);
 }
 
 function setText(id, value) {
@@ -150,6 +169,10 @@ function nodeById(id) {
 
 function repairById(id) {
   return repairs.find(repair => repair.id === id) || null;
+}
+
+function gameById(id) {
+  return games.find(game => game.id === id) || null;
 }
 
 function currentNode() {
@@ -257,7 +280,7 @@ function renderLineChips(path, options = {}) {
 
 function selectNode(id, shouldPaint = true) {
   setSelectedNodeId(id);
-  selectedRepairId = null;
+  setSelectedRepairId(null);
   populateEditor(nodeById(id));
   if (shouldPaint) paint();
 }
@@ -266,13 +289,21 @@ function renderStats() {
   const trainerPositions = buildTrainingPromptGroups().length;
   const openRepairs = repairs.filter(repair => repair.status === "needs_work").length;
   const rootLines = nodes.filter(node => !node.parent_id).length;
+  const openMistakes = mistakes.length;
+  const analyzedGames = games.length;
+  const storedPositions = positions.length;
 
   setText("nodeCount", String(nodes.length));
   setText("lineCount", String(rootLines));
   setText("trainerCount", String(trainerPositions));
   setText("repairCount", String(openRepairs));
+  setText("gameCount", String(analyzedGames));
+  setText("positionCount", String(storedPositions));
+  setText("mistakeCount", String(openMistakes));
 
   setText("dashboardEditorCount", `${nodes.length} moves`);
+  setText("dashboardGamesCount", `${analyzedGames} games`);
+  setText("dashboardPositionCount", `${storedPositions} positions`);
   setText("dashboardTrainerCount", `${trainerPositions} prompts`);
   setText("dashboardRepairCount", `${openRepairs} open`);
   setText("repairOpenCount", `${openRepairs} open`);
@@ -297,6 +328,69 @@ function renderDashboardFocus() {
   setHtml("dashboardCurrentLine", renderLineChips(path, {
     emptyText: "Selection is empty."
   }));
+}
+
+function gameStatusLabel(status) {
+  return {
+    imported_only: "Imported only",
+    quick_classified: "Quick classified",
+    human_analysis_started: "Analysis started",
+    human_analysis_complete: "Analysis complete",
+    engine_checked_later: "Engine checked later",
+    lessons_extracted: "Lessons extracted",
+    repairs_created: "Repairs created"
+  }[status] || "Imported only";
+}
+
+function renderDashboardHeatmap() {
+  const host = $("dashboardHeatmap");
+  if (!host) return;
+
+  const counts = new Map();
+  for (const mistake of mistakes) {
+    const key = mistake.category || "uncategorized";
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+
+  const rows = [...counts.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .map(([category, count]) => `
+      <article class="heatmap-row">
+        <strong>${escapeHtml(category.replace(/_/g, " "))}</strong>
+        <span>${count}</span>
+      </article>
+    `)
+    .join("");
+
+  host.innerHTML = rows || `<div class="line-empty">No mistake records yet. Once game analysis starts feeding the mistake database, repeated patterns will pile up here.</div>`;
+}
+
+function renderDashboardGameQueue() {
+  const host = $("dashboardGameQueue");
+  if (!host) return;
+
+  const queued = games
+    .filter(game => !["lessons_extracted", "repairs_created"].includes(game.analysis_status))
+    .slice()
+    .sort((left, right) => Date.parse(right.updated_at || right.created_at || "") - Date.parse(left.updated_at || left.created_at || ""))
+    .slice(0, 6);
+
+  host.innerHTML = queued.map(game => {
+    const totalPly = gameAnnotations.filter(annotation => annotation.game_id === game.id).length;
+    const extracted = gameAnnotations.filter(annotation => annotation.game_id === game.id && (annotation.position_id || annotation.mistake_id || annotation.repair_id)).length;
+
+    return `
+      <button class="queue-card" data-game-id="${game.id}" type="button">
+        <span class="study-choice-kicker">${escapeHtml(gameStatusLabel(game.analysis_status))}</span>
+        <strong>${escapeHtml(game.event || `${game.white_player || "White"} vs ${game.black_player || "Black"}`)}</strong>
+        <p>${escapeHtml([game.opening_name, game.result].filter(Boolean).join(" • ") || "No opening label yet")}</p>
+        <div class="study-choice-meta">
+          <strong>${totalPly} ply</strong>
+          <span>${extracted} extracted</span>
+        </div>
+      </button>
+    `;
+  }).join("") || `<div class="line-empty">No games in the queue yet. Import a PGN in Game Analysis Studio and the dashboard will surface unfinished work here.</div>`;
 }
 
 function renderLiveBoard() {
@@ -448,7 +542,7 @@ function populateEditor(node, { newRoot = false } = {}) {
 
 function resetEditorForNewRoot() {
   setSelectedNodeId(null);
-  selectedRepairId = null;
+  setSelectedRepairId(null);
   populateEditor(null, { newRoot: true });
   paint();
 }
@@ -1181,11 +1275,13 @@ function setRepairLink(nodeId, fallbackPath = "") {
   );
 }
 
-function resetRepairForm({ keepSelectionLink = true } = {}) {
+function resetRepairForm({ keepSelectionLink = true, clearSelectedRepair = true } = {}) {
   const repairForm = $("repairForm");
   if (!repairForm) return;
 
-  selectedRepairId = null;
+  if (clearSelectedRepair) {
+    setSelectedRepairId(null);
+  }
   repairForm.reset();
   $("repairStatusInput").value = "needs_work";
   setText("repairEditorState", "Capture the mistake, the lesson, and the repair plan.");
@@ -1200,7 +1296,7 @@ function resetRepairForm({ keepSelectionLink = true } = {}) {
 function fillRepairForm(repair) {
   if (!$("repairForm")) return;
 
-  selectedRepairId = repair.id;
+  setSelectedRepairId(repair.id);
   $("repairIdInput").value = repair.id;
   $("repairMistakeInput").value = repair.mistake || "";
   $("repairLessonInput").value = repair.lesson || "";
@@ -1334,6 +1430,8 @@ function paint() {
 
   renderStats();
   renderDashboardFocus();
+  renderDashboardHeatmap();
+  renderDashboardGameQueue();
   renderLiveBoard();
   paintTrainer();
   renderRepairFocus();
@@ -1346,15 +1444,21 @@ function paint() {
 }
 
 async function refresh() {
-  nodes = await OpeningDB.loadNodes();
-  repairs = await OpeningDB.loadRepairItems();
+  [nodes, repairs, games, gameAnnotations, positions, mistakes] = await Promise.all([
+    OpeningDB.loadNodes(),
+    OpeningDB.loadRepairItems(),
+    OpeningDB.loadGames(),
+    OpeningDB.loadGameAnnotations(),
+    OpeningDB.loadPositions(),
+    OpeningDB.loadMistakes()
+  ]);
 
   if (selectedId && !nodeById(selectedId)) {
     setSelectedNodeId(null);
   }
 
   if (selectedRepairId && !repairById(selectedRepairId)) {
-    selectedRepairId = null;
+    setSelectedRepairId(null);
   }
 
   synchronizeTrainingState();
@@ -1378,10 +1482,14 @@ async function refresh() {
 
 function backupPayload() {
   return {
-    version: 5,
+    version: 6,
     exported_at: new Date().toISOString(),
     nodes,
-    repairs
+    repairs,
+    games,
+    game_annotations: gameAnnotations,
+    positions,
+    mistakes
   };
 }
 
@@ -1403,6 +1511,42 @@ function repairItemsPayload() {
   };
 }
 
+function gamesPayload() {
+  return {
+    table: window.APP_CONFIG?.GAMES_TABLE_NAME || "games",
+    exported_at: new Date().toISOString(),
+    count: games.length,
+    rows: games
+  };
+}
+
+function gameAnnotationsPayload() {
+  return {
+    table: window.APP_CONFIG?.GAME_ANNOTATIONS_TABLE_NAME || "game_annotations",
+    exported_at: new Date().toISOString(),
+    count: gameAnnotations.length,
+    rows: gameAnnotations
+  };
+}
+
+function positionsPayload() {
+  return {
+    table: window.APP_CONFIG?.POSITIONS_TABLE_NAME || "positions",
+    exported_at: new Date().toISOString(),
+    count: positions.length,
+    rows: positions
+  };
+}
+
+function mistakesPayload() {
+  return {
+    table: window.APP_CONFIG?.MISTAKES_TABLE_NAME || "mistakes",
+    exported_at: new Date().toISOString(),
+    count: mistakes.length,
+    rows: mistakes
+  };
+}
+
 function exportOpeningNodesJson() {
   downloadJsonFile("gm-opening-tree-opening-nodes.json", openingNodesPayload());
   showToast("Opening nodes exported.");
@@ -1413,9 +1557,45 @@ function exportRepairItemsJson() {
   showToast("Repair items exported.");
 }
 
+function exportGamesJson() {
+  downloadJsonFile("gm-brain-games.json", gamesPayload());
+  showToast("Games exported.");
+}
+
+function exportGameAnnotationsJson() {
+  downloadJsonFile("gm-brain-game-annotations.json", gameAnnotationsPayload());
+  showToast("Game annotations exported.");
+}
+
+function exportPositionsJson() {
+  downloadJsonFile("gm-brain-positions.json", positionsPayload());
+  showToast("Positions exported.");
+}
+
+function exportMistakesJson() {
+  downloadJsonFile("gm-brain-mistakes.json", mistakesPayload());
+  showToast("Mistakes exported.");
+}
+
+function exportFullBackupJson() {
+  downloadJsonFile("gm-brain-full-backup.json", backupPayload());
+  showToast("Full backup exported.");
+}
+
 function exportAllSafetyBackups() {
-  exportOpeningNodesJson();
-  window.setTimeout(() => exportRepairItemsJson(), 120);
+  const tasks = [
+    exportFullBackupJson,
+    exportOpeningNodesJson,
+    exportRepairItemsJson,
+    exportGamesJson,
+    exportGameAnnotationsJson,
+    exportPositionsJson,
+    exportMistakesJson
+  ];
+
+  tasks.forEach((task, index) => {
+    window.setTimeout(task, index * 140);
+  });
 }
 
 function ensureBackupPrompt() {
@@ -1428,18 +1608,20 @@ function ensureBackupPrompt() {
   dialog.innerHTML = `
     <div class="backup-prompt-card" role="dialog" aria-modal="true" aria-labelledby="backupPromptTitle">
       <p class="eyebrow">Safety export</p>
-      <h3 id="backupPromptTitle">Download both table backups before you work.</h3>
+      <h3 id="backupPromptTitle">Download your full backup before you work.</h3>
       <p class="muted">
-        This quick safety step exports the opening tree table and the repair table separately, so if anything goes wrong later you keep a clean snapshot of both.
+        This quick safety step exports one full JSON restore file plus the current table snapshots for moves, repairs, games, annotations, positions, and mistakes.
       </p>
       <div class="backup-prompt-meta">
         <span id="backupPromptNodeCount" class="status-pill">0 opening nodes</span>
         <span id="backupPromptRepairCount" class="status-pill">0 repair items</span>
+        <span id="backupPromptGameCount" class="status-pill">0 games</span>
+        <span id="backupPromptPositionCount" class="status-pill">0 positions</span>
       </div>
       <div class="backup-prompt-actions">
-        <button id="backupExportAllBtn" class="button button-primary" type="button">Export both now</button>
-        <button id="backupExportNodesBtn" class="button button-secondary" type="button">Opening nodes JSON</button>
-        <button id="backupExportRepairsBtn" class="button button-secondary" type="button">Repair items JSON</button>
+        <button id="backupExportAllBtn" class="button button-primary" type="button">Export everything now</button>
+        <button id="backupExportFullBtn" class="button button-secondary" type="button">Full backup JSON</button>
+        <button id="backupExportTablesBtn" class="button button-secondary" type="button">All table snapshots</button>
         <button id="backupDismissBtn" class="button button-ghost" type="button">Later</button>
       </div>
     </div>
@@ -1451,8 +1633,15 @@ function ensureBackupPrompt() {
     exportAllSafetyBackups();
     hideBackupPrompt();
   });
-  $("backupExportNodesBtn")?.addEventListener("click", exportOpeningNodesJson);
-  $("backupExportRepairsBtn")?.addEventListener("click", exportRepairItemsJson);
+  $("backupExportFullBtn")?.addEventListener("click", exportFullBackupJson);
+  $("backupExportTablesBtn")?.addEventListener("click", () => {
+    exportOpeningNodesJson();
+    window.setTimeout(() => exportRepairItemsJson(), 120);
+    window.setTimeout(() => exportGamesJson(), 240);
+    window.setTimeout(() => exportGameAnnotationsJson(), 360);
+    window.setTimeout(() => exportPositionsJson(), 480);
+    window.setTimeout(() => exportMistakesJson(), 600);
+  });
   $("backupDismissBtn")?.addEventListener("click", hideBackupPrompt);
   dialog.addEventListener("click", event => {
     if (event.target === dialog) hideBackupPrompt();
@@ -1465,6 +1654,8 @@ function showBackupPrompt() {
   const dialog = ensureBackupPrompt();
   setText("backupPromptNodeCount", `${nodes.length} opening node${nodes.length === 1 ? "" : "s"}`);
   setText("backupPromptRepairCount", `${repairs.length} repair item${repairs.length === 1 ? "" : "s"}`);
+  setText("backupPromptGameCount", `${games.length} game${games.length === 1 ? "" : "s"}`);
+  setText("backupPromptPositionCount", `${positions.length} position${positions.length === 1 ? "" : "s"}`);
   dialog.classList.remove("hidden");
   sessionStorage.setItem(BACKUP_PROMPT_SESSION_KEY, "seen");
 }
@@ -1484,7 +1675,11 @@ function parseImportedBackup(text) {
   if (Array.isArray(parsed)) {
     return {
       nodes: parsed.map(OpeningDB.normalizeNode),
-      repairs: []
+      repairs,
+      games,
+      gameAnnotations,
+      positions,
+      mistakes
     };
   }
 
@@ -1495,14 +1690,66 @@ function parseImportedBackup(text) {
   if (parsed.table === (window.APP_CONFIG?.TABLE_NAME || "opening_nodes") && Array.isArray(parsed.rows)) {
     return {
       nodes: parsed.rows.map(OpeningDB.normalizeNode),
-      repairs
+      repairs,
+      games,
+      gameAnnotations,
+      positions,
+      mistakes
     };
   }
 
   if (parsed.table === (window.APP_CONFIG?.REPAIR_TABLE_NAME || "repair_items") && Array.isArray(parsed.rows)) {
     return {
       nodes,
-      repairs: parsed.rows.map(OpeningDB.normalizeRepairItem)
+      repairs: parsed.rows.map(OpeningDB.normalizeRepairItem),
+      games,
+      gameAnnotations,
+      positions,
+      mistakes
+    };
+  }
+
+  if (parsed.table === (window.APP_CONFIG?.GAMES_TABLE_NAME || "games") && Array.isArray(parsed.rows)) {
+    return {
+      nodes,
+      repairs,
+      games: parsed.rows.map(OpeningDB.normalizeGame),
+      gameAnnotations,
+      positions,
+      mistakes
+    };
+  }
+
+  if (parsed.table === (window.APP_CONFIG?.GAME_ANNOTATIONS_TABLE_NAME || "game_annotations") && Array.isArray(parsed.rows)) {
+    return {
+      nodes,
+      repairs,
+      games,
+      gameAnnotations: parsed.rows.map(OpeningDB.normalizeGameAnnotation),
+      positions,
+      mistakes
+    };
+  }
+
+  if (parsed.table === (window.APP_CONFIG?.POSITIONS_TABLE_NAME || "positions") && Array.isArray(parsed.rows)) {
+    return {
+      nodes,
+      repairs,
+      games,
+      gameAnnotations,
+      positions: parsed.rows.map(OpeningDB.normalizePosition),
+      mistakes
+    };
+  }
+
+  if (parsed.table === (window.APP_CONFIG?.MISTAKES_TABLE_NAME || "mistakes") && Array.isArray(parsed.rows)) {
+    return {
+      nodes,
+      repairs,
+      games,
+      gameAnnotations,
+      positions,
+      mistakes: parsed.rows.map(OpeningDB.normalizeMistake)
     };
   }
 
@@ -1518,8 +1765,26 @@ function parseImportedBackup(text) {
 
   return {
     nodes: importedNodes.map(OpeningDB.normalizeNode),
-    repairs: Array.isArray(parsed.repairs) ? parsed.repairs.map(OpeningDB.normalizeRepairItem) : []
+    repairs: Array.isArray(parsed.repairs) ? parsed.repairs.map(OpeningDB.normalizeRepairItem) : repairs,
+    games: Array.isArray(parsed.games) ? parsed.games.map(OpeningDB.normalizeGame) : games,
+    gameAnnotations: Array.isArray(parsed.game_annotations)
+      ? parsed.game_annotations.map(OpeningDB.normalizeGameAnnotation)
+      : gameAnnotations,
+    positions: Array.isArray(parsed.positions) ? parsed.positions.map(OpeningDB.normalizePosition) : positions,
+    mistakes: Array.isArray(parsed.mistakes) ? parsed.mistakes.map(OpeningDB.normalizeMistake) : mistakes
   };
+}
+
+const dashboardGameQueue = $("dashboardGameQueue");
+if (dashboardGameQueue) {
+  dashboardGameQueue.addEventListener("click", event => {
+    const button = event.target.closest("[data-game-id]");
+    if (!button) return;
+
+    localStorage.setItem("gm_brain_selected_game_v1", button.dataset.gameId);
+    localStorage.setItem("gm_brain_selected_game_ply_v1", "0");
+    window.location.href = "./games.html";
+  });
 }
 
 const moveForm = $("moveForm");
@@ -1559,7 +1824,7 @@ if (repairForm) {
       };
 
       await OpeningDB.upsertRepairItem(repair);
-      selectedRepairId = repair.id;
+      setSelectedRepairId(repair.id);
 
       await refresh();
       showToast(navigator.onLine ? "Repair saved." : "Repair saved locally.");
@@ -1617,7 +1882,7 @@ if (treeEl) {
     if (event.target.closest("#backLineBtn")) {
       const current = currentNode();
       setSelectedNodeId(current?.parent_id || null);
-      selectedRepairId = null;
+      setSelectedRepairId(null);
       if (selectedId) populateEditor(nodeById(selectedId));
       else populateEditor(null);
       paint();
@@ -1626,7 +1891,7 @@ if (treeEl) {
 
     if (event.target.closest("#rootLineBtn")) {
       setSelectedNodeId(null);
-      selectedRepairId = null;
+      setSelectedRepairId(null);
       populateEditor(null);
       paint();
     }
@@ -1676,7 +1941,7 @@ if (repairListEl) {
     if (action === "delete" && confirm("Delete this repair loop?")) {
       try {
         if (selectedRepairId === repair.id) {
-          selectedRepairId = null;
+          setSelectedRepairId(null);
           resetRepairForm({ keepSelectionLink: true });
         }
         await OpeningDB.deleteRepairItem(repair.id);
@@ -1873,8 +2138,12 @@ if (importBtn && importInput) {
       const imported = parseImportedBackup(text);
       await OpeningDB.saveAllNodes(imported.nodes);
       await OpeningDB.saveAllRepairItems(imported.repairs);
+      await OpeningDB.saveAllGames(imported.games, { allowEmpty: true });
+      await OpeningDB.saveAllGameAnnotations(imported.gameAnnotations, { allowEmpty: true });
+      await OpeningDB.saveAllPositions(imported.positions, { allowEmpty: true });
+      await OpeningDB.saveAllMistakes(imported.mistakes, { allowEmpty: true });
       setSelectedNodeId(null);
-      selectedRepairId = null;
+      setSelectedRepairId(null);
       trainingState.prompt = null;
       trainingState.result = null;
       trainingState.revealOpen = false;
@@ -1892,7 +2161,7 @@ if (importBtn && importInput) {
 }
 
 if ($("moveInput")) populateEditor(null);
-if ($("repairForm")) resetRepairForm({ keepSelectionLink: false });
+if ($("repairForm")) resetRepairForm({ keepSelectionLink: false, clearSelectedRepair: false });
 try {
   await refresh();
 } catch (error) {

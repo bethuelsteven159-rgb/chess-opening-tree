@@ -1,0 +1,361 @@
+GM OPENING TREE - CURRENT APP STATE
+Snapshot updated for the personal-game-analysis sprint.
+
+This file describes what the app currently does in practice, not just what the product vision wants later.
+
+==================================================
+1. PAGE MAP
+==================================================
+
+The app currently has 7 user-facing pages:
+
+1. `index.html`
+   Dashboard.
+
+2. `editor.html`
+   Move editor workspace.
+
+3. `games.html`
+   Game Analysis Studio.
+
+4. `positions.html`
+   Position Vault.
+
+5. `training.html`
+   Opening trainer.
+
+6. `repair.html`
+   Repair loop workspace.
+
+7. `login.html`
+   Owner-only login.
+
+There is also:
+
+8. `random.html`
+   Legacy redirect.
+   It now forwards to `training.html`.
+
+
+==================================================
+2. AUTH + OFFLINE BEHAVIOR
+==================================================
+
+The app is still owner-only.
+
+Allowed email:
+- `bethuelsteven159@gmail.com`
+
+Protected pages use the stored Supabase session first.
+
+Practical effect:
+
+- if you stay logged in, the installed app can keep working offline
+- if you log out, offline access stops until you log in again online
+
+Offline-capable modules right now:
+
+- move editor
+- training
+- repair loop
+- game analysis
+- position vault
+- backup export
+
+When Supabase is unavailable:
+
+- local saves still succeed
+- pending sync copies are preserved
+- recovery snapshots are preserved
+- the app refuses to wipe local data with empty remote state
+
+
+==================================================
+3. DATA COLLECTIONS
+==================================================
+
+The app now works with 6 logical collections:
+
+1. `opening_nodes`
+2. `repair_items`
+3. `games`
+4. `game_annotations`
+5. `positions`
+6. `mistakes`
+
+All six collections use the same safety pattern in `js/db.js`:
+
+- current local copy
+- non-empty snapshot copy
+- pending sync copy
+- guarded remote load
+- guarded remote save
+
+Important protection behavior:
+
+- non-empty remote data is not blindly replaced by empty payloads
+- if remote data is empty but local data exists, local data is preserved
+- if pending local sync does not match remote state, pending local data is preserved
+- connectivity failure keeps the latest local copy
+
+
+==================================================
+4. DASHBOARD
+==================================================
+
+The dashboard is no longer just a launcher.
+
+It now shows:
+
+- move count
+- root-line count
+- analyzed game count
+- saved position count
+- mistake count
+- repair count
+- current selected move focus
+- weakness heatmap by mistake category
+- unfinished game-analysis queue
+
+Dashboard study lanes currently link to:
+
+- move editor
+- game analysis
+- position vault
+- training mode
+- repair loop
+
+
+==================================================
+5. MOVE EDITOR
+==================================================
+
+`editor.html` still contains:
+
+- line explorer
+- move editor form
+- live board
+- move explanation panel
+- import/export controls
+
+Current move metadata supported:
+
+- move SAN
+- title
+- explanation
+- tags
+- highlight kind
+- preferred repertoire move
+- do-not-train flag
+
+The live board shows:
+
+- current move
+- move type
+- position status
+- move explanation
+- board line
+
+
+==================================================
+6. GAME ANALYSIS STUDIO
+==================================================
+
+`games.html` is the new sprint module.
+
+Current capabilities:
+
+- paste PGN directly
+- import PGN from file
+- choose whether you played White or Black
+- add platform and tags at import time
+- replay the imported game move by move
+- navigate start / previous / next / end
+- review a clickable move list
+
+Per-move human note fields currently supported:
+
+- what I thought before the move
+- what I learned after the move
+- candidate moves
+- rejected candidate moves
+- expected reply
+- actual reply
+- human evaluation
+- confidence / emotional state
+- critical moment flag
+- critical moment type
+- mistake flag
+
+Extraction actions from the currently selected move:
+
+1. save position card
+2. create mistake record
+3. create repair card
+
+The page also:
+
+- tries to link the imported game to the deepest matching opening-tree node
+- tracks game analysis status
+- stores overall game summary
+- allows deleting a stored game and its annotations
+
+
+==================================================
+7. POSITION VAULT
+==================================================
+
+`positions.html` is now the home for extracted positions.
+
+Current capabilities:
+
+- list saved positions
+- filter by position type
+- search by title, themes, tags, or lesson text
+- display board from saved FEN
+- edit:
+  - title
+  - short question
+  - position type
+  - themes
+  - tags
+  - human evaluation
+  - best human move
+  - correct idea
+  - wrong idea
+  - lesson
+
+Cross-links currently supported:
+
+- open source game in `games.html`
+- open linked opening node in `editor.html`
+- open linked repair in `repair.html`
+
+
+==================================================
+8. TRAINING MODE
+==================================================
+
+`training.html` still trains the opening tree only.
+
+Current training flow:
+
+1. choose color
+2. choose study root
+3. start line
+4. see board position
+5. hear the opponent reply
+6. enter the repertoire move
+7. reveal answer
+8. ask why
+9. continue line or jump to next line
+
+Training logic details:
+
+- preferred moves count as accepted answers when branches exist
+- moves marked do not train are skipped
+- black-root training still works when the root starts as something like `1...e5`
+
+
+==================================================
+9. REPAIR LOOP
+==================================================
+
+`repair.html` still manages:
+
+- mistake
+- lesson
+- repair action
+- status
+
+Status values:
+
+- `needs_work`
+- `solved`
+
+New practical improvement:
+
+- Position Vault can now pass a linked repair into the repair page so the repair board opens on the correct item
+
+
+==================================================
+10. BACKUP / EXPORT / IMPORT
+==================================================
+
+Current export formats now include:
+
+1. full backup
+   - `gm-brain-full-backup.json`
+
+2. table snapshots
+   - `gm-opening-tree-opening-nodes.json`
+   - `gm-opening-tree-repair-items.json`
+   - `gm-brain-games.json`
+   - `gm-brain-game-annotations.json`
+   - `gm-brain-positions.json`
+   - `gm-brain-mistakes.json`
+
+Entry behavior:
+
+- protected pages prompt once per session to export backups
+- prompt now includes opening nodes, repairs, games, and positions summary counts
+
+Import behavior:
+
+- import still happens from `editor.html`
+- supports old node-only arrays
+- supports older combined node/repair backups
+- supports single-table snapshots
+- supports the new full-backup format with all six collections
+
+
+==================================================
+11. SQL / REMOTE REQUIREMENT
+==================================================
+
+To sync the new sprint remotely, the user still needs to run:
+
+- `supabase/schema.sql`
+
+That script now creates or upgrades:
+
+- `games`
+- `game_annotations`
+- `positions`
+- `mistakes`
+
+If the SQL is not run yet:
+
+- the new pages still work locally
+- sync for the new collections stays local-only
+- the app warns that the remote tables are missing
+
+
+==================================================
+12. WHAT THIS BUILD REALLY CHANGED
+==================================================
+
+Before this sprint, the app could:
+
+- store opening moves
+- train opening moves
+- store repair notes
+
+After this sprint, the app can now also:
+
+- import your own games
+- replay them without engine-first workflow
+- store what you were thinking move by move
+- mark critical moments
+- extract positions
+- extract mistakes
+- create repairs directly from game moments
+- surface repeated weakness categories on the dashboard
+
+This means the app has crossed the bridge from:
+
+- opening-tree workspace
+
+to:
+
+- early chess-brain workspace
