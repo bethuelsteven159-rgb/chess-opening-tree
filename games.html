@@ -12,7 +12,7 @@
   <script>
     document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
   </script>
-  <link rel="stylesheet" href="styles.css?v=15" />
+  <link rel="stylesheet" href="styles.css?v=16" />
   <script src="vendor/supabase-js.min.js"></script>
   <script src="vendor/chess.min.js"></script>
 </head>
@@ -51,7 +51,7 @@
 
     <input id="pgnFileInput" class="hidden-file-input" type="file" accept=".pgn,text/plain" />
 
-    <section class="panel page-intro-panel">
+    <section class="panel page-intro-panel game-studio-intro">
       <div class="section-heading">
         <div>
           <p class="eyebrow">Game analysis studio</p>
@@ -70,131 +70,22 @@
   </header>
 
   <main class="page-shell games-shell">
-    <section class="panel game-import-panel">
-      <div class="section-heading">
-        <div>
-          <h3>PGN intake</h3>
-          <p class="muted">Paste a full PGN or import one from a file, then lock in which color you played before saving it.</p>
-        </div>
-
-        <div class="stack-actions">
-          <button id="importGameBtn" class="button button-primary button-tiny" type="button">Import game</button>
-        </div>
-      </div>
-
-      <div class="game-import-grid">
-        <label>
-          I played
-          <select id="gameUserColorInput">
-            <option value="white">White</option>
-            <option value="black">Black</option>
-          </select>
-        </label>
-
-        <label>
-          Platform
-          <input id="gamePlatformInput" placeholder="Lichess, Chess.com, OTB event..." />
-        </label>
-
-        <label>
-          Tags
-          <input id="gameTagsInput" placeholder="Italian, rapid, tournament, nerves..." />
-        </label>
-      </div>
-
-      <label>
-        PGN
-        <textarea id="pgnInput" rows="9" placeholder='[Event "Weekend Rapid"]&#10;[White "Me"]&#10;[Black "Opponent"]&#10;1. e4 e5 2. Nf3 Nc6 3. Bc4 ...'></textarea>
-      </label>
-    </section>
-
-    <section class="game-analysis-layout">
-      <aside class="panel game-list-panel">
-        <div class="section-heading">
-          <div>
-            <h3>Saved games</h3>
-            <p class="muted">Select a game to replay it and extract lessons.</p>
-          </div>
-          <span id="gameQueueBadge" class="status-pill">0 need work</span>
-        </div>
-
-        <div id="gameList" class="game-list"></div>
-      </aside>
-
-      <div class="game-analysis-stack">
-        <section class="panel game-replay-panel">
-          <div class="live-board-heading">
+    <section class="games-workspace">
+      <div class="games-left-rail">
+        <section class="panel game-meta-panel">
+          <div class="section-heading side-panel-heading">
             <div>
-              <p class="eyebrow">Replay board</p>
-              <h3 id="gameBoardTitle">No game selected</h3>
-              <p id="gameBoardSubtitle" class="muted">Import a PGN and the board will build a replayable move-by-move analysis workspace.</p>
-            </div>
-            <div id="gameBoardMeta" class="status-pill">Waiting for PGN</div>
-          </div>
-
-          <div class="live-board-layout">
-            <div class="board-stage">
-              <div class="board-frame">
-                <div id="gameBoard" class="chess-board" role="img" aria-label="Game replay board"></div>
-              </div>
-
-              <div class="game-replay-controls">
-                <button id="gameStartBtn" class="button button-secondary button-tiny" type="button">|&lt;</button>
-                <button id="gamePrevBtn" class="button button-secondary button-tiny" type="button">&lt;</button>
-                <button id="gameNextBtn" class="button button-secondary button-tiny" type="button">&gt;</button>
-                <button id="gameEndBtn" class="button button-secondary button-tiny" type="button">&gt;|</button>
-              </div>
+              <h3>Game meta</h3>
+              <p class="muted">Store the overall lesson and track how far the analysis is finished.</p>
             </div>
 
-            <div class="board-sidebar">
-              <div class="board-detail-grid board-detail-grid-triple">
-                <article class="board-detail-card">
-                  <span class="board-detail-label">Current move</span>
-                  <strong id="gameMoveValue">Start position</strong>
-                  <p id="gameMoveCaption">The selected ply will appear here.</p>
-                </article>
-
-                <article class="board-detail-card">
-                  <span class="board-detail-label">Linked opening</span>
-                  <strong id="gameOpeningValue">No match yet</strong>
-                  <p id="gameOpeningCaption">When the imported game overlaps your opening tree, the deepest matching node will show here.</p>
-                </article>
-
-                <article class="board-detail-card">
-                  <span class="board-detail-label">Analysis status</span>
-                  <strong id="gameStatusValue">Imported only</strong>
-                  <p id="gameStatusCaption">Move notes and extracted lessons will push the game through the workflow.</p>
-                </article>
-              </div>
-
-              <article class="board-detail-card board-detail-wide">
-                <span class="board-detail-label">Move list</span>
-                <div id="gameMoveList" class="game-move-list"></div>
-              </article>
-
-              <div class="form-actions">
-                <button id="createPositionBtn" class="button button-secondary" type="button">Save position card</button>
-                <button id="createMistakeBtn" class="button button-secondary" type="button">Create mistake record</button>
-                <button id="createRepairBtn" class="button button-primary" type="button">Create repair card</button>
-              </div>
+            <div class="stack-actions side-panel-actions">
+              <button id="saveGameMetaBtn" class="button button-secondary button-tiny" type="button">Save meta</button>
+              <button id="deleteGameBtn" class="button button-danger button-tiny" type="button">Delete game</button>
             </div>
           </div>
-        </section>
 
-        <section class="game-analysis-secondary">
-          <section class="panel game-meta-panel">
-            <div class="section-heading">
-              <div>
-                <h3>Game meta</h3>
-                <p class="muted">Store the overall lesson and track how far the analysis is finished.</p>
-              </div>
-
-              <div class="stack-actions">
-                <button id="saveGameMetaBtn" class="button button-secondary button-tiny" type="button">Save meta</button>
-                <button id="deleteGameBtn" class="button button-danger button-tiny" type="button">Delete game</button>
-              </div>
-            </div>
-
+          <div class="game-meta-body">
             <div class="game-meta-grid">
               <label>
                 Analysis status
@@ -214,22 +105,24 @@
                 <textarea id="gameSummaryInput" rows="5" placeholder="Where did the game turn, what theme mattered, and what must be remembered next time?"></textarea>
               </label>
             </div>
-          </section>
+          </div>
+        </section>
 
-          <section class="panel annotation-panel">
-            <div class="section-heading">
-              <div>
-                <h3>Move-by-move human notes</h3>
-                <p id="annotationEditorStatus" class="muted">Select a move in the replay to record what you thought, feared, or missed.</p>
-              </div>
-
-              <div class="stack-actions">
-                <button id="saveAnnotationBtn" class="button button-primary button-tiny" type="button">Save move note</button>
-              </div>
+        <section class="panel annotation-panel">
+          <div class="section-heading side-panel-heading">
+            <div>
+              <h3>Move-by-move human notes</h3>
+              <p id="annotationEditorStatus" class="muted">Select a move in the replay to record what you thought, feared, or missed.</p>
             </div>
 
-            <div id="annotationHintBanner" class="repair-link-banner">No move selected yet.</div>
+            <div class="stack-actions side-panel-actions">
+              <button id="saveAnnotationBtn" class="button button-primary button-tiny" type="button">Save move note</button>
+            </div>
+          </div>
 
+          <div id="annotationHintBanner" class="repair-link-banner">No move selected yet.</div>
+
+          <div class="annotation-scroll">
             <div class="annotation-grid">
               <label>
                 What I thought before the move
@@ -282,7 +175,7 @@
               </label>
             </div>
 
-            <div class="form-grid two-up">
+            <div class="form-grid two-up annotation-check-grid">
               <label class="check-row">
                 <input id="criticalMomentInput" type="checkbox" />
                 <span>
@@ -299,9 +192,120 @@
                 </span>
               </label>
             </div>
-          </section>
+          </div>
         </section>
       </div>
+
+      <section class="panel game-replay-panel">
+        <div class="live-board-heading">
+          <div>
+            <p class="eyebrow">Replay board</p>
+            <h3 id="gameBoardTitle">No game selected</h3>
+            <p id="gameBoardSubtitle" class="muted">Import a PGN and the board will build a replayable move-by-move analysis workspace.</p>
+          </div>
+          <div id="gameBoardMeta" class="status-pill">Waiting for PGN</div>
+        </div>
+
+        <div class="game-replay-layout">
+          <div class="board-stage">
+            <div class="board-frame game-board-frame">
+              <div id="gameBoard" class="chess-board" role="img" aria-label="Game replay board"></div>
+            </div>
+
+            <div class="game-replay-controls">
+              <button id="gameStartBtn" class="button button-secondary button-tiny" type="button">|&lt;</button>
+              <button id="gamePrevBtn" class="button button-secondary button-tiny" type="button">&lt;</button>
+              <button id="gameNextBtn" class="button button-secondary button-tiny" type="button">&gt;</button>
+              <button id="gameEndBtn" class="button button-secondary button-tiny" type="button">&gt;|</button>
+            </div>
+          </div>
+
+          <div class="game-replay-sidebar">
+            <div class="board-detail-grid board-detail-grid-triple game-replay-detail-grid">
+              <article class="board-detail-card">
+                <span class="board-detail-label">Current move</span>
+                <strong id="gameMoveValue">Start position</strong>
+                <p id="gameMoveCaption">The selected ply will appear here.</p>
+              </article>
+
+              <article class="board-detail-card">
+                <span class="board-detail-label">Linked opening</span>
+                <strong id="gameOpeningValue">No match yet</strong>
+                <p id="gameOpeningCaption">When the imported game overlaps your opening tree, the deepest matching node will show here.</p>
+              </article>
+
+              <article class="board-detail-card">
+                <span class="board-detail-label">Analysis status</span>
+                <strong id="gameStatusValue">Imported only</strong>
+                <p id="gameStatusCaption">Move notes and extracted lessons will push the game through the workflow.</p>
+              </article>
+            </div>
+
+            <article class="board-detail-card board-detail-wide game-move-list-card">
+              <span class="board-detail-label">Move list</span>
+              <div id="gameMoveList" class="game-move-list"></div>
+            </article>
+
+            <div class="form-actions game-create-actions">
+              <button id="createPositionBtn" class="button button-secondary" type="button">Save position card</button>
+              <button id="createMistakeBtn" class="button button-secondary" type="button">Create mistake record</button>
+              <button id="createRepairBtn" class="button button-primary" type="button">Create repair card</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel game-list-panel">
+        <div class="section-heading">
+          <div>
+            <h3>Saved games</h3>
+            <p class="muted">Select a game to replay it and extract lessons.</p>
+          </div>
+          <span id="gameQueueBadge" class="status-pill">0 need work</span>
+        </div>
+
+        <div id="gameList" class="game-list"></div>
+      </aside>
+
+      <section class="panel game-import-panel">
+        <div class="section-heading side-panel-heading">
+          <div>
+            <h3>PGN intake</h3>
+            <p class="muted">Paste a full PGN or import one from a file, then lock in which color you played before saving it.</p>
+          </div>
+
+          <div class="stack-actions side-panel-actions">
+            <button id="importGameBtn" class="button button-primary button-tiny" type="button">Import game</button>
+          </div>
+        </div>
+
+        <div class="game-import-body">
+          <div class="game-import-grid">
+            <label>
+              I played
+              <select id="gameUserColorInput">
+                <option value="white">White</option>
+                <option value="black">Black</option>
+              </select>
+            </label>
+
+            <label>
+              Platform
+              <input id="gamePlatformInput" placeholder="Lichess, Chess.com, OTB event..." />
+            </label>
+
+            <label>
+              Tags
+              <input id="gameTagsInput" placeholder="Italian, rapid, tournament, nerves..." />
+            </label>
+          </div>
+
+          <label class="game-pgn-field">
+            PGN
+            <textarea id="pgnInput" rows="16" placeholder='[Event "Weekend Rapid"]&#10;[White "Me"]&#10;[Black "Opponent"]&#10;1. e4 e5 2. Nf3 Nc6 3. Bc4 ...'></textarea>
+          </label>
+        </div>
+      </section>
     </section>
   </main>
 
@@ -311,7 +315,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
-  <script type="module" src="./js/games.js?v=15"></script>
+  <script type="module" src="./js/games.js?v=16"></script>
   <script>
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
   </script>
