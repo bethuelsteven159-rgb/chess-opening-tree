@@ -33,6 +33,8 @@ if (!window.OpeningDB) {
 }
 
 const SELECTED_BOOK_STORAGE_KEY = "gm_brain_selected_support_book_v1";
+const SELECTED_SUPPORT_PANE_STORAGE_KEY = "gm_brain_selected_support_pane_v1";
+const SUPPORT_PANES = new Set(["quick", "goals", "reminders", "books", "cards", "tournaments", "ideas"]);
 
 const SUPPORT_CARD_LABELS = {
   identity: "Identity",
@@ -132,9 +134,18 @@ let tournamentNotes = [];
 let quickIdeas = [];
 let selectedBookId = localStorage.getItem(SELECTED_BOOK_STORAGE_KEY) || null;
 let randomCardId = null;
+let selectedSupportPane = localStorage.getItem(SELECTED_SUPPORT_PANE_STORAGE_KEY) || "quick";
+
+if (!SUPPORT_PANES.has(selectedSupportPane)) {
+  selectedSupportPane = "quick";
+}
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function saveSelectedSupportPane() {
+  localStorage.setItem(SELECTED_SUPPORT_PANE_STORAGE_KEY, selectedSupportPane);
 }
 
 function saveSelectedBook() {
@@ -206,6 +217,35 @@ function tagRowHtml(tags = []) {
 function optionHtml(value, label, selectedValue = "") {
   const selected = value === selectedValue ? " selected" : "";
   return `<option value="${escapeHtml(value)}"${selected}>${escapeHtml(label)}</option>`;
+}
+
+function syncSupportPaneState() {
+  if (!SUPPORT_PANES.has(selectedSupportPane)) {
+    selectedSupportPane = "quick";
+  }
+
+  document.querySelectorAll("[data-support-pane-button]").forEach(button => {
+    const active = button.dataset.supportPaneButton === selectedSupportPane;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+
+  document.querySelectorAll("[data-support-pane]").forEach(panel => {
+    const active = panel.dataset.supportPane === selectedSupportPane;
+    panel.classList.toggle("is-active", active);
+    panel.hidden = !active;
+    panel.setAttribute("aria-hidden", String(!active));
+  });
+}
+
+function setSupportPane(pane, options = {}) {
+  if (!SUPPORT_PANES.has(pane)) return;
+  selectedSupportPane = pane;
+  if (options.persist !== false) saveSelectedSupportPane();
+  syncSupportPaneState();
+  if (options.scroll) {
+    $("supportWorkspaceTabs")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 function fillSelectOptions(selectId, items, selectedValue, emptyLabel) {
@@ -1098,6 +1138,23 @@ function renderQuickIdeas() {
   `).join(""));
 }
 
+function renderSupportWorkspaceTabs() {
+  const activeGoalCount = goals.filter(goal => goal.status === "active").length;
+  const dueReminderCount = appReminders.filter(isReminderDue).length;
+  const currentBookCount = books.filter(book => book.status === "currently_reading").length;
+  const pinnedCardCount = supportCards.filter(card => card.status === "active" && card.pinned).length;
+  const upcomingTournamentCount = tournamentNotes.filter(note => ["planned", "active"].includes(note.status) && note.event_date && compareDateKeys(note.event_date, todayKey()) >= 0).length;
+  const inboxIdeaCount = quickIdeas.filter(idea => idea.status === "inbox").length;
+
+  setText("supportPaneGoalsMeta", `${activeGoalCount} active`);
+  setText("supportPaneRemindersMeta", `${dueReminderCount} due`);
+  setText("supportPaneBooksMeta", `${currentBookCount} current`);
+  setText("supportPaneCardsMeta", `${pinnedCardCount} pinned`);
+  setText("supportPaneTournamentsMeta", `${upcomingTournamentCount} upcoming`);
+  setText("supportPaneIdeasMeta", `${inboxIdeaCount} inbox`);
+  syncSupportPaneState();
+}
+
 function paint() {
   populateLinkedSelects();
   renderIntroStats();
@@ -1109,6 +1166,7 @@ function paint() {
   renderSupportCards();
   renderTournamentNotes();
   renderQuickIdeas();
+  renderSupportWorkspaceTabs();
 }
 
 async function refresh() {
@@ -1171,7 +1229,9 @@ async function handleReminderSnooze(reminder, days) {
 }
 
 function scrollToForm(formId) {
-  $(formId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  window.requestAnimationFrame(() => {
+    $(formId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 }
 
 async function createStarterDeck() {
@@ -2027,18 +2087,21 @@ $("supportTodayList")?.addEventListener("click", async event => {
     }
 
     if (button.dataset.commandAction === "edit-goal") {
+      setSupportPane("goals", { scroll: true });
       fillGoalForm(goalById(button.dataset.commandId));
       scrollToForm("goalForm");
       return;
     }
 
     if (button.dataset.commandAction === "edit-card") {
+      setSupportPane("cards", { scroll: true });
       fillSupportCardForm(supportCardById(button.dataset.commandId));
       scrollToForm("supportCardForm");
       return;
     }
 
     if (button.dataset.commandAction === "edit-book") {
+      setSupportPane("books", { scroll: true });
       selectedBookId = button.dataset.commandId;
       saveSelectedBook();
       fillBookForm(bookById(button.dataset.commandId));
@@ -2048,6 +2111,12 @@ $("supportTodayList")?.addEventListener("click", async event => {
   } catch (error) {
     reportActionError("Updating command center item", error);
   }
+});
+
+$("supportWorkspaceTabs")?.addEventListener("click", event => {
+  const button = event.target.closest("[data-support-pane-button]");
+  if (!button) return;
+  setSupportPane(button.dataset.supportPaneButton);
 });
 
 [

@@ -1996,6 +1996,8 @@ select:focus {
 
 .support-grid,
 .support-command-panel,
+.support-switcher-panel,
+.support-detail-stack,
 .support-quick-panel,
 .support-section-panel,
 .support-section-column,
@@ -2017,6 +2019,57 @@ select:focus {
 .support-quick-panel,
 .support-section-panel {
   min-height: 0;
+}
+
+.support-workspace-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.support-workspace-tab {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-height: 92px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0)),
+    linear-gradient(145deg, rgba(240, 187, 87, 0.05), rgba(95, 192, 172, 0.05));
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+.support-workspace-tab:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--line));
+}
+
+.support-workspace-tab.is-active {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 10%, transparent);
+  background:
+    linear-gradient(135deg, rgba(240, 187, 87, 0.12), rgba(255, 255, 255, 0.02)),
+    linear-gradient(145deg, rgba(95, 192, 172, 0.12), rgba(255, 255, 255, 0));
+}
+
+.support-workspace-tab strong {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+}
+
+.support-workspace-tab span {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.support-pane:not(.is-active) {
+  display: none;
 }
 
 .support-quick-form,

@@ -115,7 +115,49 @@
         </div>
       </section>
 
-      <section class="panel support-quick-panel">
+      <section class="panel support-switcher-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Support workspaces</p>
+            <h3>Open one lane at a time</h3>
+            <p class="muted">Choose the exact support job below so the page stays calm instead of becoming one long planner.</p>
+          </div>
+        </div>
+
+        <div id="supportWorkspaceTabs" class="support-workspace-tabs" aria-label="Support workspaces">
+          <button class="support-workspace-tab is-active" type="button" data-support-pane-button="quick" aria-pressed="true">
+            <strong>Quick capture</strong>
+            <span>Save fast</span>
+          </button>
+          <button class="support-workspace-tab" type="button" data-support-pane-button="goals" aria-pressed="false">
+            <strong>Goals</strong>
+            <span id="supportPaneGoalsMeta">0 active</span>
+          </button>
+          <button class="support-workspace-tab" type="button" data-support-pane-button="reminders" aria-pressed="false">
+            <strong>Reminders</strong>
+            <span id="supportPaneRemindersMeta">0 due</span>
+          </button>
+          <button class="support-workspace-tab" type="button" data-support-pane-button="books" aria-pressed="false">
+            <strong>Books</strong>
+            <span id="supportPaneBooksMeta">0 current</span>
+          </button>
+          <button class="support-workspace-tab" type="button" data-support-pane-button="cards" aria-pressed="false">
+            <strong>Cards</strong>
+            <span id="supportPaneCardsMeta">0 pinned</span>
+          </button>
+          <button class="support-workspace-tab" type="button" data-support-pane-button="tournaments" aria-pressed="false">
+            <strong>Events</strong>
+            <span id="supportPaneTournamentsMeta">0 upcoming</span>
+          </button>
+          <button class="support-workspace-tab" type="button" data-support-pane-button="ideas" aria-pressed="false">
+            <strong>Ideas</strong>
+            <span id="supportPaneIdeasMeta">0 inbox</span>
+          </button>
+        </div>
+      </section>
+
+      <div class="support-detail-stack">
+        <section class="panel support-quick-panel support-pane is-active" data-support-pane="quick">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Quick capture</p>
@@ -158,7 +200,7 @@
         </form>
       </section>
 
-      <section class="panel support-section-panel">
+        <section class="panel support-section-panel support-pane" data-support-pane="goals">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Goals board</p>
@@ -345,7 +387,7 @@
         </div>
       </section>
 
-      <section class="panel support-section-panel">
+        <section class="panel support-section-panel support-pane" data-support-pane="reminders">
         <div class="section-heading">
           <div>
             <p class="eyebrow">In-app reminders</p>
@@ -500,7 +542,7 @@
         </div>
       </section>
 
-      <section class="panel support-section-panel">
+        <section class="panel support-section-panel support-pane" data-support-pane="books">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Reading shelf</p>
@@ -781,7 +823,7 @@
         </div>
       </section>
 
-      <section class="panel support-section-panel">
+        <section class="panel support-section-panel support-pane" data-support-pane="cards">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Support cards</p>
@@ -942,7 +984,7 @@
         </div>
       </section>
 
-      <section class="panel support-section-panel">
+        <section class="panel support-section-panel support-pane" data-support-pane="tournaments">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Tournament notes</p>
@@ -1073,7 +1115,7 @@
         </div>
       </section>
 
-      <section class="panel support-section-panel">
+        <section class="panel support-section-panel support-pane" data-support-pane="ideas">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Quick ideas inbox</p>
@@ -1161,6 +1203,7 @@
           </form>
         </div>
       </section>
+      </div>
     </div>
   </main>
 
