@@ -1,0 +1,1178 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GM Opening Tree - Support Hub</title>
+  <meta name="theme-color" content="#08111d" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
+  </script>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="vendor/supabase-js.min.js"></script>
+</head>
+<body class="app-page" data-page="support">
+  <div class="texture-grid"></div>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+
+  <header class="page-shell page-header">
+    <nav class="topbar">
+      <a class="brand brand-link" href="index.html">
+        <span class="logo">&#9823;</span>
+        <div>
+          <h1>GM Opening Tree</h1>
+          <p>Support hub</p>
+        </div>
+      </a>
+
+      <div class="page-nav" aria-label="Primary">
+        <a class="nav-link" href="index.html">Dashboard</a>
+        <a class="nav-link" href="editor.html">Move Editor</a>
+        <a class="nav-link" href="games.html">Games</a>
+        <a class="nav-link" href="positions.html">Positions</a>
+        <a class="nav-link" href="training.html">Training</a>
+        <a class="nav-link" href="repair.html">Repair</a>
+        <a class="nav-link is-current" href="support.html">Support</a>
+      </div>
+
+      <div class="nav-actions">
+        <button id="themeToggleBtn" class="button button-secondary button-tiny" type="button">Light mode</button>
+        <button id="syncBtn" class="button button-primary button-tiny" type="button">Sync</button>
+        <button id="logoutBtn" class="button button-secondary button-tiny" type="button">Logout</button>
+      </div>
+    </nav>
+
+    <section class="panel page-intro-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Support hub</p>
+          <h2>Keep the non-board parts of the GM journey in one calm place.</h2>
+          <p class="muted">
+            Goals, reminders, books, principles, tournament notes, and quick ideas live here so the chess pages stay clean and the bigger mission stays visible.
+          </p>
+        </div>
+
+        <div class="page-intro-meta intro-stat-stack">
+          <span id="supportActiveGoalCount" class="status-pill">0 active goals</span>
+          <span id="supportDueReminderCount" class="status-pill">0 due reminders</span>
+          <span id="supportCurrentBookCount" class="status-pill">0 current books</span>
+          <span id="supportPinnedCardCount" class="status-pill">0 pinned cards</span>
+        </div>
+      </div>
+    </section>
+  </header>
+
+  <main class="page-shell support-shell">
+    <div class="support-grid">
+      <section class="panel support-command-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Support command center</p>
+            <h3>Visible now</h3>
+            <p class="muted">The support layer keeps goals, books, reminders, and reset cards in one place without cluttering the board work.</p>
+          </div>
+        </div>
+
+        <div class="support-card-grid">
+          <article class="board-detail-card">
+            <span class="board-detail-label">Active goals</span>
+            <strong id="supportCommandActiveGoals">0</strong>
+            <p>Direction that is still live.</p>
+          </article>
+
+          <article class="board-detail-card">
+            <span class="board-detail-label">Due reminders</span>
+            <strong id="supportCommandDueReminders">0</strong>
+            <p>Visible work due today or earlier.</p>
+          </article>
+
+          <article class="board-detail-card">
+            <span class="board-detail-label">Current books</span>
+            <strong id="supportCommandCurrentBooks">0</strong>
+            <p>Reading that should become usable study material.</p>
+          </article>
+
+          <article class="board-detail-card">
+            <span class="board-detail-label">Pinned cards</span>
+            <strong id="supportCommandPinnedCards">0</strong>
+            <p>Principles worth seeing often.</p>
+          </article>
+        </div>
+
+        <div class="support-list-wrap">
+          <div class="section-heading">
+            <div>
+              <h4>Today / visible now</h4>
+              <p class="muted">Urgent reminders, pinned cards, near-term goals, and active books.</p>
+            </div>
+          </div>
+          <div id="supportTodayList" class="support-list"></div>
+        </div>
+      </section>
+
+      <section class="panel support-quick-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Quick capture</p>
+            <h3>Save the thought before it evaporates</h3>
+            <p class="muted">Capture now, organize later.</p>
+          </div>
+        </div>
+
+        <form id="supportQuickForm" class="support-quick-form">
+          <label>
+            Type
+            <select id="supportQuickTypeInput">
+              <option value="Idea">Idea</option>
+              <option value="Support card">Support card</option>
+              <option value="Goal">Goal</option>
+              <option value="Reminder">Reminder</option>
+              <option value="Book">Book</option>
+              <option value="Tournament note">Tournament note</option>
+            </select>
+          </label>
+
+          <label>
+            Title
+            <input id="supportQuickTitleInput" placeholder="A reminder, principle, goal, or book..." />
+          </label>
+
+          <label class="support-form-span">
+            Body
+            <textarea id="supportQuickBodyInput" rows="4" placeholder="Write the thought in plain language first."></textarea>
+          </label>
+
+          <label class="support-form-span">
+            Tags
+            <input id="supportQuickTagsInput" placeholder="tilt, event prep, opening book, discipline..." />
+          </label>
+
+          <div class="form-actions support-form-span">
+            <button id="supportQuickSaveBtn" class="button button-primary" type="submit">Save capture</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel support-section-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Goals board</p>
+            <h3>Direction, not noise</h3>
+            <p class="muted">Store long-term and short-term direction without turning the app into a planner.</p>
+          </div>
+          <span id="goalSummaryPill" class="status-pill">0 active goals</span>
+        </div>
+
+        <div class="support-editor-grid">
+          <div class="support-section-column">
+            <div class="position-filter-grid">
+              <label>
+                Search
+                <input id="goalSearchInput" placeholder="Rating, process, event, book..." />
+              </label>
+
+              <label>
+                Status
+                <select id="goalStatusFilter">
+                  <option value="all">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="not_started">Not started</option>
+                  <option value="paused">Paused</option>
+                  <option value="achieved">Achieved</option>
+                  <option value="abandoned">Abandoned</option>
+                </select>
+              </label>
+
+              <label>
+                Goal type
+                <select id="goalTypeFilter">
+                  <option value="all">All goal types</option>
+                  <option value="ultimate">Ultimate</option>
+                  <option value="annual">Annual</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="rating">Rating</option>
+                  <option value="tournament">Tournament</option>
+                  <option value="book">Book</option>
+                  <option value="process">Process</option>
+                  <option value="mindset">Mindset</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </label>
+
+              <label>
+                Priority
+                <select id="goalPriorityFilter">
+                  <option value="all">All priorities</option>
+                  <option value="critical">Critical</option>
+                  <option value="high">High</option>
+                  <option value="normal">Normal</option>
+                  <option value="low">Low</option>
+                </select>
+              </label>
+            </div>
+
+            <div id="goalList" class="support-list"></div>
+          </div>
+
+          <form id="goalForm" class="support-form-card">
+            <input id="goalIdInput" type="hidden" />
+            <div class="section-heading">
+              <div>
+                <h4 id="goalEditorState">New goal</h4>
+                <p class="muted">Add the destination before the app becomes only storage.</p>
+              </div>
+            </div>
+
+            <div class="support-form-grid">
+              <label class="support-form-span">
+                Title
+                <input id="goalTitleInput" placeholder="Reach 2100 rapid, finish the endgame book..." />
+              </label>
+
+              <label>
+                Goal type
+                <select id="goalTypeInput">
+                  <option value="ultimate">Ultimate</option>
+                  <option value="annual">Annual</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="rating">Rating</option>
+                  <option value="tournament">Tournament</option>
+                  <option value="book">Book</option>
+                  <option value="process">Process</option>
+                  <option value="mindset">Mindset</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </label>
+
+              <label>
+                Status
+                <select id="goalStatusInput">
+                  <option value="active">Active</option>
+                  <option value="not_started">Not started</option>
+                  <option value="paused">Paused</option>
+                  <option value="achieved">Achieved</option>
+                  <option value="abandoned">Abandoned</option>
+                </select>
+              </label>
+
+              <label>
+                Priority
+                <select id="goalPriorityInput">
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                  <option value="low">Low</option>
+                </select>
+              </label>
+
+              <label class="support-form-span">
+                Description
+                <textarea id="goalDescriptionInput" rows="3" placeholder="What exactly should happen?"></textarea>
+              </label>
+
+              <label class="support-form-span">
+                Why this matters
+                <textarea id="goalWhyInput" rows="3" placeholder="Why is this goal worth attention?"></textarea>
+              </label>
+
+              <label class="support-form-span">
+                Success criteria
+                <textarea id="goalSuccessCriteriaInput" rows="3" placeholder="How will you know the goal is truly done?"></textarea>
+              </label>
+
+              <label>
+                Current value
+                <input id="goalCurrentValueInput" type="number" step="0.01" placeholder="0" />
+              </label>
+
+              <label>
+                Target value
+                <input id="goalTargetValueInput" type="number" step="0.01" placeholder="100" />
+              </label>
+
+              <label>
+                Unit
+                <input id="goalUnitInput" placeholder="rating, books, repairs, percent..." />
+              </label>
+
+              <label>
+                Manual progress %
+                <input id="goalManualProgressInput" type="number" min="0" max="100" step="1" placeholder="0" />
+              </label>
+
+              <label>
+                Target date
+                <input id="goalTargetDateInput" type="date" />
+              </label>
+
+              <label>
+                Parent goal
+                <select id="goalParentInput">
+                  <option value="">No parent goal</option>
+                </select>
+              </label>
+
+              <label>
+                Linked book
+                <select id="goalLinkedBookInput">
+                  <option value="">No linked book</option>
+                </select>
+              </label>
+
+              <label class="support-form-span">
+                Linked support cards
+                <select id="goalLinkedSupportCardsInput" multiple size="4"></select>
+              </label>
+
+              <label class="support-form-span">
+                Tags
+                <input id="goalTagsInput" placeholder="rating, discipline, event prep..." />
+              </label>
+            </div>
+
+            <div class="form-actions">
+              <button class="button button-primary" type="submit">Save goal</button>
+              <button id="goalResetBtn" class="button button-secondary" type="button">Reset</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="panel support-section-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">In-app reminders</p>
+            <h3>Only reminders that belong inside the chess brain</h3>
+            <p class="muted">Visible when you open the app, with no browser notifications or external calendar clutter.</p>
+          </div>
+          <span id="reminderSummaryPill" class="status-pill">0 reminders</span>
+        </div>
+
+        <div class="support-editor-grid">
+          <div class="support-section-column">
+            <div class="position-filter-grid">
+              <label>
+                Search
+                <input id="reminderSearchInput" placeholder="Goal review, anti-tilt, registration..." />
+              </label>
+
+              <label>
+                View
+                <select id="reminderVisibilityFilter">
+                  <option value="active">Active only</option>
+                  <option value="all">All reminders</option>
+                  <option value="done">Done and archived</option>
+                </select>
+              </label>
+            </div>
+
+            <div id="reminderList" class="support-list"></div>
+          </div>
+
+          <form id="reminderForm" class="support-form-card">
+            <input id="reminderIdInput" type="hidden" />
+            <div class="section-heading">
+              <div>
+                <h4 id="reminderEditorState">New reminder</h4>
+                <p class="muted">Add only the reminders that should appear inside the app.</p>
+              </div>
+            </div>
+
+            <div class="support-form-grid">
+              <label class="support-form-span">
+                Title
+                <input id="reminderTitleInput" placeholder="Review the sharp line before the event..." />
+              </label>
+
+              <label>
+                Reminder type
+                <select id="reminderTypeInput">
+                  <option value="goal">Goal</option>
+                  <option value="book">Book</option>
+                  <option value="tournament">Tournament</option>
+                  <option value="admin">Admin</option>
+                  <option value="mindset">Mindset</option>
+                  <option value="review">Review</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </label>
+
+              <label>
+                Status
+                <select id="reminderStatusInput">
+                  <option value="active">Active</option>
+                  <option value="done">Done</option>
+                  <option value="snoozed">Snoozed</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </label>
+
+              <label>
+                Priority
+                <select id="reminderPriorityInput">
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                  <option value="low">Low</option>
+                </select>
+              </label>
+
+              <label>
+                Due date
+                <input id="reminderDueDateInput" type="date" />
+              </label>
+
+              <label>
+                Due time
+                <input id="reminderDueTimeInput" type="time" />
+              </label>
+
+              <label>
+                Repeat rule
+                <select id="reminderRepeatRuleInput">
+                  <option value="none">None</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="custom_days">Custom days</option>
+                </select>
+              </label>
+
+              <label>
+                Repeat interval
+                <input id="reminderRepeatIntervalInput" type="number" min="1" step="1" value="1" />
+              </label>
+
+              <label class="support-form-span">
+                Repeat days
+                <input id="reminderRepeatDaysInput" placeholder="mon, wed, fri" />
+              </label>
+
+              <label>
+                Snooze until
+                <input id="reminderSnoozeUntilInput" type="date" />
+              </label>
+
+              <label>
+                Linked goal
+                <select id="reminderLinkedGoalInput">
+                  <option value="">No linked goal</option>
+                </select>
+              </label>
+
+              <label>
+                Linked book
+                <select id="reminderLinkedBookInput">
+                  <option value="">No linked book</option>
+                </select>
+              </label>
+
+              <label>
+                Linked support card
+                <select id="reminderLinkedSupportCardInput">
+                  <option value="">No linked card</option>
+                </select>
+              </label>
+
+              <label class="support-form-span">
+                Note
+                <textarea id="reminderNoteInput" rows="4" placeholder="What should this reminder surface when the app opens?"></textarea>
+              </label>
+
+              <label class="support-form-span">
+                Tags
+                <input id="reminderTagsInput" placeholder="review, logistics, anti-tilt..." />
+              </label>
+            </div>
+
+            <div class="form-actions">
+              <button class="button button-primary" type="submit">Save reminder</button>
+              <button id="reminderResetBtn" class="button button-secondary" type="button">Reset</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="panel support-section-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Reading shelf</p>
+            <h3>Reading only matters when it creates lessons, positions, repairs, or better decisions.</h3>
+            <p class="muted">Track the books and resources that should feed the chess brain, not passive consumption.</p>
+          </div>
+          <span id="bookSummaryPill" class="status-pill">0 books</span>
+        </div>
+
+        <div class="support-book-grid">
+          <div class="support-section-column">
+            <div class="position-filter-grid">
+              <label>
+                Search
+                <input id="bookSearchInput" placeholder="Book title, author, lesson..." />
+              </label>
+
+              <label>
+                Area
+                <select id="bookAreaFilter">
+                  <option value="all">All areas</option>
+                  <option value="opening">Opening</option>
+                  <option value="middlegame">Middlegame</option>
+                  <option value="endgame">Endgame</option>
+                  <option value="tactics">Tactics</option>
+                  <option value="calculation">Calculation</option>
+                  <option value="strategy">Strategy</option>
+                  <option value="game_collection">Game collection</option>
+                  <option value="psychology">Psychology</option>
+                  <option value="tournament_play">Tournament play</option>
+                  <option value="biography">Biography</option>
+                  <option value="general">General</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+
+              <label>
+                Status
+                <select id="bookStatusFilter">
+                  <option value="all">All statuses</option>
+                  <option value="currently_reading">Currently reading</option>
+                  <option value="want_to_read">Want to read</option>
+                  <option value="paused">Paused</option>
+                  <option value="finished">Finished</option>
+                  <option value="dropped">Dropped</option>
+                  <option value="reference">Reference</option>
+                </select>
+              </label>
+            </div>
+
+            <div id="bookList" class="support-list"></div>
+          </div>
+
+          <form id="bookForm" class="support-form-card">
+            <input id="bookIdInput" type="hidden" />
+            <div class="section-heading">
+              <div>
+                <h4 id="bookEditorState">New book</h4>
+                <p class="muted">Turn reading into extracted lessons and useful next actions.</p>
+              </div>
+            </div>
+
+            <div class="support-form-grid">
+              <label class="support-form-span">
+                Title
+                <input id="bookTitleInput" placeholder="Dvoretsky, Yusupov, a PDF course..." />
+              </label>
+
+              <label>
+                Author
+                <input id="bookAuthorInput" placeholder="Author or creator" />
+              </label>
+
+              <label>
+                Format
+                <select id="bookFormatInput">
+                  <option value="book">Book</option>
+                  <option value="pdf">PDF</option>
+                  <option value="course">Course</option>
+                  <option value="video_series">Video series</option>
+                  <option value="article">Article</option>
+                  <option value="website">Website</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+
+              <label>
+                Status
+                <select id="bookStatusInput">
+                  <option value="want_to_read">Want to read</option>
+                  <option value="currently_reading">Currently reading</option>
+                  <option value="paused">Paused</option>
+                  <option value="finished">Finished</option>
+                  <option value="dropped">Dropped</option>
+                  <option value="reference">Reference</option>
+                </select>
+              </label>
+
+              <label>
+                Area
+                <select id="bookAreaInput">
+                  <option value="opening">Opening</option>
+                  <option value="middlegame">Middlegame</option>
+                  <option value="endgame">Endgame</option>
+                  <option value="tactics">Tactics</option>
+                  <option value="calculation">Calculation</option>
+                  <option value="strategy">Strategy</option>
+                  <option value="game_collection">Game collection</option>
+                  <option value="psychology">Psychology</option>
+                  <option value="tournament_play">Tournament play</option>
+                  <option value="biography">Biography</option>
+                  <option value="general">General</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+
+              <label class="support-form-span">
+                Reason for reading
+                <textarea id="bookReasonInput" rows="3" placeholder="Why is this resource worth your attention?"></textarea>
+              </label>
+
+              <label class="support-form-span">
+                What this teaches
+                <textarea id="bookTeachesInput" rows="3" placeholder="What practical value should come out of this?"></textarea>
+              </label>
+
+              <label>
+                Current page
+                <input id="bookCurrentPageInput" type="number" min="0" step="1" />
+              </label>
+
+              <label>
+                Total pages
+                <input id="bookTotalPagesInput" type="number" min="1" step="1" />
+              </label>
+
+              <label>
+                Manual progress %
+                <input id="bookProgressPercentInput" type="number" min="0" max="100" step="1" />
+              </label>
+
+              <label>
+                Started date
+                <input id="bookStartedAtInput" type="date" />
+              </label>
+
+              <label>
+                Target finish date
+                <input id="bookTargetFinishInput" type="date" />
+              </label>
+
+              <label>
+                Finished date
+                <input id="bookFinishedAtInput" type="date" />
+              </label>
+
+              <label>
+                Rating
+                <input id="bookRatingInput" type="number" min="1" max="5" step="1" />
+              </label>
+
+              <label class="support-form-span">
+                Key lessons
+                <textarea id="bookKeyLessonsInput" rows="3" placeholder="What ideas are already usable?"></textarea>
+              </label>
+
+              <label class="support-form-span">
+                Action items
+                <textarea id="bookActionItemsInput" rows="3" placeholder="What should happen in the app because of this reading?"></textarea>
+              </label>
+
+              <label>
+                Source URL
+                <input id="bookSourceUrlInput" placeholder="https://..." />
+              </label>
+
+              <label>
+                File label
+                <input id="bookFileLabelInput" placeholder="Local PDF name or shelf label" />
+              </label>
+
+              <label class="support-form-span">
+                Tags
+                <input id="bookTagsInput" placeholder="opening, rook endings, practical play..." />
+              </label>
+            </div>
+
+            <div class="form-actions">
+              <button class="button button-primary" type="submit">Save book</button>
+              <button id="bookResetBtn" class="button button-secondary" type="button">Reset</button>
+            </div>
+          </form>
+
+          <div class="support-form-card">
+            <div class="section-heading">
+              <div>
+                <h4 id="bookNotePanelTitle">Book notes</h4>
+                <p class="muted">Extract the useful ideas before the reading disappears.</p>
+              </div>
+            </div>
+
+            <div class="position-filter-grid">
+              <label>
+                Search notes
+                <input id="bookNoteSearchInput" placeholder="Lesson, chapter, tactic..." />
+              </label>
+            </div>
+
+            <div id="bookNoteList" class="support-list"></div>
+
+            <form id="bookNoteForm" class="support-subform">
+              <input id="bookNoteIdInput" type="hidden" />
+              <div class="section-heading">
+                <div>
+                  <h4 id="bookNoteEditorState">New book note</h4>
+                  <p class="muted">Notes stay tied to the selected book.</p>
+                </div>
+              </div>
+
+              <div class="support-form-grid">
+                <label class="support-form-span">
+                  Title
+                  <input id="bookNoteTitleInput" placeholder="Chapter takeaway or drillable idea" />
+                </label>
+
+                <label>
+                  Page
+                  <input id="bookNotePageInput" placeholder="112" />
+                </label>
+
+                <label>
+                  Chapter
+                  <input id="bookNoteChapterInput" placeholder="Chapter 5" />
+                </label>
+
+                <label class="support-form-span">
+                  Note
+                  <textarea id="bookNoteInput" rows="3" placeholder="What did the author actually say?"></textarea>
+                </label>
+
+                <label class="support-form-span">
+                  Lesson
+                  <textarea id="bookNoteLessonInput" rows="3" placeholder="What principle or usable lesson survives?"></textarea>
+                </label>
+
+                <label class="support-form-span">
+                  Action item
+                  <textarea id="bookNoteActionInput" rows="3" placeholder="What should happen in the app because of this note?"></textarea>
+                </label>
+
+                <label class="support-form-span">
+                  Tags
+                  <input id="bookNoteTagsInput" placeholder="fortress, exchange sac, prophylaxis..." />
+                </label>
+
+                <label>
+                  Linked opening node ID
+                  <input id="bookNoteOpeningIdInput" placeholder="Optional" />
+                </label>
+
+                <label>
+                  Linked position ID
+                  <input id="bookNotePositionIdInput" placeholder="Optional" />
+                </label>
+
+                <label>
+                  Linked repair ID
+                  <input id="bookNoteRepairIdInput" placeholder="Optional" />
+                </label>
+              </div>
+
+              <div class="form-actions">
+                <button class="button button-primary" type="submit">Save note</button>
+                <button id="bookNoteResetBtn" class="button button-secondary" type="button">Reset</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel support-section-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Support cards</p>
+            <h3>Principles, reset notes, and identity reminders</h3>
+            <p class="muted">Cards shape thinking, emotional stability, and discipline without crowding the analysis pages.</p>
+          </div>
+          <div class="stack-actions">
+            <button id="supportRandomCardBtn" class="button button-secondary button-tiny" type="button">Random card</button>
+            <button id="supportStarterDeckBtn" class="button button-ghost button-tiny" type="button">Create starter deck</button>
+          </div>
+        </div>
+
+        <div id="supportRandomCardResult" class="panel-note">No random card shown yet.</div>
+
+        <div class="support-editor-grid">
+          <div class="support-section-column">
+            <div class="position-filter-grid">
+              <label>
+                Search
+                <input id="supportSearchInput" placeholder="Title, body, tag, source..." />
+              </label>
+
+              <label>
+                Card type
+                <select id="supportCardTypeFilter">
+                  <option value="all">All card types</option>
+                  <option value="identity">Identity</option>
+                  <option value="principle">Principle</option>
+                  <option value="quote">Quote</option>
+                  <option value="anti_tilt">Anti-tilt</option>
+                  <option value="advice">Advice</option>
+                  <option value="checklist">Checklist</option>
+                  <option value="mindset">Mindset</option>
+                  <option value="study_rule">Study rule</option>
+                  <option value="tournament">Tournament</option>
+                  <option value="note">Note</option>
+                </select>
+              </label>
+
+              <label>
+                Category
+                <select id="supportGlobalFilterInput">
+                  <option value="all">All categories</option>
+                  <option value="vision">Vision</option>
+                  <option value="discipline">Discipline</option>
+                  <option value="emotional_control">Emotional control</option>
+                  <option value="study_process">Study process</option>
+                  <option value="tournament_strength">Tournament strength</option>
+                  <option value="confidence">Confidence</option>
+                  <option value="recovery">Recovery</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+
+              <label class="support-inline-check">
+                <input id="supportPinnedOnlyInput" type="checkbox" />
+                <span>Pinned only</span>
+              </label>
+            </div>
+
+            <div id="supportCardList" class="support-list"></div>
+          </div>
+
+          <form id="supportCardForm" class="support-form-card">
+            <input id="supportCardIdInput" type="hidden" />
+            <div class="section-heading">
+              <div>
+                <h4 id="supportCardEditorState">New support card</h4>
+                <p class="muted">Add the principles, reminders, and reset notes that keep the journey stable.</p>
+              </div>
+            </div>
+
+            <div class="support-form-grid">
+              <label class="support-form-span">
+                Title
+                <input id="supportCardTitleInput" placeholder="After a painful loss, Book rule, Tournament reset..." />
+              </label>
+
+              <label>
+                Card type
+                <select id="supportCardTypeInput">
+                  <option value="identity">Identity</option>
+                  <option value="principle">Principle</option>
+                  <option value="quote">Quote</option>
+                  <option value="anti_tilt">Anti-tilt</option>
+                  <option value="advice">Advice</option>
+                  <option value="checklist">Checklist</option>
+                  <option value="mindset">Mindset</option>
+                  <option value="study_rule">Study rule</option>
+                  <option value="tournament">Tournament</option>
+                  <option value="note">Note</option>
+                </select>
+              </label>
+
+              <label>
+                Category
+                <select id="supportCardCategoryInput">
+                  <option value="vision">Vision</option>
+                  <option value="discipline">Discipline</option>
+                  <option value="emotional_control">Emotional control</option>
+                  <option value="study_process">Study process</option>
+                  <option value="tournament_strength">Tournament strength</option>
+                  <option value="confidence">Confidence</option>
+                  <option value="recovery">Recovery</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+
+              <label>
+                Priority
+                <select id="supportCardPriorityInput">
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                  <option value="low">Low</option>
+                </select>
+              </label>
+
+              <label>
+                Status
+                <select id="supportCardStatusInput">
+                  <option value="active">Active</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </label>
+
+              <label class="support-inline-check">
+                <input id="supportCardPinnedInput" type="checkbox" />
+                <span>Pinned</span>
+              </label>
+
+              <label class="support-form-span">
+                Body
+                <textarea id="supportCardBodyInput" rows="5" placeholder="Write the principle in calm, reusable language."></textarea>
+              </label>
+
+              <label>
+                Source
+                <input id="supportCardSourceInput" placeholder="Coach, event, book, self..." />
+              </label>
+
+              <label>
+                Source URL
+                <input id="supportCardSourceUrlInput" placeholder="Optional link" />
+              </label>
+
+              <label class="support-form-span">
+                Tags
+                <input id="supportCardTagsInput" placeholder="tilt, discipline, prep, vision..." />
+              </label>
+            </div>
+
+            <div class="form-actions">
+              <button class="button button-primary" type="submit">Save card</button>
+              <button id="supportCardResetBtn" class="button button-secondary" type="button">Reset</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="panel support-section-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Tournament notes</p>
+            <h3>Preparation and reflection around the event</h3>
+            <p class="muted">Tournament prep belongs here. The actual games still belong in Game Analysis Studio.</p>
+          </div>
+          <span id="tournamentSummaryPill" class="status-pill">0 upcoming events</span>
+        </div>
+
+        <div id="tournamentNextEvent" class="panel-note">No tournament notes yet. Add event prep when there is a real tournament to prepare for.</div>
+
+        <div class="support-editor-grid">
+          <div class="support-section-column">
+            <div class="position-filter-grid">
+              <label>
+                Search
+                <input id="tournamentSearchInput" placeholder="Event, location, focus..." />
+              </label>
+
+              <label>
+                Status
+                <select id="tournamentStatusFilter">
+                  <option value="all">All statuses</option>
+                  <option value="planned">Planned</option>
+                  <option value="active">Active</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </label>
+            </div>
+
+            <div id="tournamentNoteList" class="support-list"></div>
+          </div>
+
+          <form id="tournamentNoteForm" class="support-form-card">
+            <input id="tournamentNoteIdInput" type="hidden" />
+            <div class="section-heading">
+              <div>
+                <h4 id="tournamentEditorState">New tournament note</h4>
+                <p class="muted">Store prep, logistics, focus, and after-event lessons in one place.</p>
+              </div>
+            </div>
+
+            <div class="support-form-grid">
+              <label class="support-form-span">
+                Event name
+                <input id="tournamentEventNameInput" placeholder="Weekend Swiss, Club Championship..." />
+              </label>
+
+              <label>
+                Event date
+                <input id="tournamentEventDateInput" type="date" />
+              </label>
+
+              <label>
+                Event location
+                <input id="tournamentLocationInput" placeholder="Venue or city" />
+              </label>
+
+              <label>
+                Time control
+                <input id="tournamentTimeControlInput" placeholder="90+30, rapid, blitz..." />
+              </label>
+
+              <label>
+                Section
+                <input id="tournamentSectionInput" placeholder="Open, U2000, Club A..." />
+              </label>
+
+              <label>
+                Status
+                <select id="tournamentStatusInput">
+                  <option value="planned">Planned</option>
+                  <option value="active">Active</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </label>
+
+              <label>
+                Linked goal
+                <select id="tournamentLinkedGoalInput">
+                  <option value="">No linked goal</option>
+                </select>
+              </label>
+
+              <label class="support-form-span">
+                Pre-event goal
+                <textarea id="tournamentPreGoalInput" rows="3" placeholder="What does a good event actually look like?"></textarea>
+              </label>
+
+              <label class="support-form-span">
+                Opening focus
+                <textarea id="tournamentOpeningFocusInput" rows="3" placeholder="Which lines must feel fresh before round one?"></textarea>
+              </label>
+
+              <label class="support-form-span">
+                Mental focus
+                <textarea id="tournamentMentalFocusInput" rows="3" placeholder="What inner rules matter most during the event?"></textarea>
+              </label>
+
+              <label class="support-form-span">
+                Practical checklist
+                <textarea id="tournamentChecklistInput" rows="3" placeholder="Travel, food, scoresheets, clocks, rest..."></textarea>
+              </label>
+
+              <label class="support-form-span">
+                Round notes
+                <textarea id="tournamentRoundNotesInput" rows="3" placeholder="Round-by-round observations or reminders."></textarea>
+              </label>
+
+              <label class="support-form-span">
+                After-event lessons
+                <textarea id="tournamentAfterLessonsInput" rows="3" placeholder="What should survive after the event ends?"></textarea>
+              </label>
+
+              <label class="support-form-span">
+                Tags
+                <input id="tournamentTagsInput" placeholder="classical, prep, stamina, nerves..." />
+              </label>
+            </div>
+
+            <div class="form-actions">
+              <button class="button button-primary" type="submit">Save tournament note</button>
+              <button id="tournamentResetBtn" class="button button-secondary" type="button">Reset</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="panel support-section-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Quick ideas inbox</p>
+            <h3>Loose thoughts before they disappear</h3>
+            <p class="muted">Capture the messy thought now, then convert it into a card, goal, reminder, book, or tournament note later.</p>
+          </div>
+          <span id="quickIdeaSummaryPill" class="status-pill">0 inbox ideas</span>
+        </div>
+
+        <div class="support-editor-grid">
+          <div class="support-section-column">
+            <div class="position-filter-grid">
+              <label>
+                Search
+                <input id="quickIdeaSearchInput" placeholder="Loose idea, app improvement, prep note..." />
+              </label>
+
+              <label>
+                Status
+                <select id="quickIdeaStatusFilter">
+                  <option value="inbox">Inbox</option>
+                  <option value="all">All ideas</option>
+                  <option value="converted">Converted</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </label>
+            </div>
+
+            <div id="quickIdeaList" class="support-list"></div>
+          </div>
+
+          <form id="quickIdeaForm" class="support-form-card">
+            <input id="quickIdeaIdInput" type="hidden" />
+            <div class="section-heading">
+              <div>
+                <h4 id="quickIdeaEditorState">New quick idea</h4>
+                <p class="muted">Capture the thought before it disappears.</p>
+              </div>
+            </div>
+
+            <div class="support-form-grid">
+              <label class="support-form-span">
+                Title
+                <input id="quickIdeaTitleInput" placeholder="Small opening drill idea, event checklist, mindset note..." />
+              </label>
+
+              <label>
+                Idea type
+                <select id="quickIdeaTypeInput">
+                  <option value="general">General</option>
+                  <option value="opening">Opening</option>
+                  <option value="training">Training</option>
+                  <option value="book">Book</option>
+                  <option value="mindset">Mindset</option>
+                  <option value="tournament">Tournament</option>
+                  <option value="app_improvement">App improvement</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+
+              <label>
+                Status
+                <select id="quickIdeaStatusInput">
+                  <option value="inbox">Inbox</option>
+                  <option value="converted">Converted</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </label>
+
+              <label class="support-form-span">
+                Body
+                <textarea id="quickIdeaBodyInput" rows="5" placeholder="Messy is fine here."></textarea>
+              </label>
+
+              <label class="support-form-span">
+                Tags
+                <input id="quickIdeaTagsInput" placeholder="study flow, anti-tilt, tournament, app..." />
+              </label>
+            </div>
+
+            <div class="form-actions">
+              <button class="button button-primary" type="submit">Save idea</button>
+              <button id="quickIdeaResetBtn" class="button button-secondary" type="button">Reset</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="page-shell page-footer">
+    <p>Support is where the goals, books, reminders, and calm reset cards live.</p>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/db.js"></script>
+  <script type="module" src="./js/support.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
+  </script>
+</body>
+</html>

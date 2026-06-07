@@ -1,5 +1,5 @@
 GM OPENING TREE - CURRENT APP STATE
-Snapshot updated for the personal-game-analysis sprint.
+Snapshot updated for the Support Hub sprint.
 
 This file describes what the app currently does in practice, not just what the product vision wants later.
 
@@ -7,7 +7,7 @@ This file describes what the app currently does in practice, not just what the p
 1. PAGE MAP
 ==================================================
 
-The app currently has 7 user-facing pages:
+The app currently has 8 user-facing pages:
 
 1. `index.html`
    Dashboard.
@@ -27,14 +27,17 @@ The app currently has 7 user-facing pages:
 6. `repair.html`
    Repair loop workspace.
 
-7. `login.html`
+7. `support.html`
+   Support Hub.
+
+8. `login.html`
    Owner-only login.
 
 There is also:
 
-8. `random.html`
+9. `random.html`
    Legacy redirect.
-   It now forwards to `training.html`.
+   It forwards to `training.html`.
 
 
 ==================================================
@@ -60,6 +63,7 @@ Offline-capable modules right now:
 - repair loop
 - game analysis
 - position vault
+- Support Hub
 - backup export
 
 When Supabase is unavailable:
@@ -74,7 +78,7 @@ When Supabase is unavailable:
 3. DATA COLLECTIONS
 ==================================================
 
-The app now works with 6 logical collections:
+The app now works with 13 logical collections:
 
 1. `opening_nodes`
 2. `repair_items`
@@ -82,8 +86,15 @@ The app now works with 6 logical collections:
 4. `game_annotations`
 5. `positions`
 6. `mistakes`
+7. `support_cards`
+8. `goals`
+9. `app_reminders`
+10. `books`
+11. `book_notes`
+12. `tournament_notes`
+13. `quick_ideas`
 
-All six collections use the same safety pattern in `js/db.js`:
+All 13 collections use the same safety pattern in `js/db.js`:
 
 - current local copy
 - non-empty snapshot copy
@@ -103,9 +114,7 @@ Important protection behavior:
 4. DASHBOARD
 ==================================================
 
-The dashboard is no longer just a launcher.
-
-It now shows:
+The dashboard now shows:
 
 - move count
 - root-line count
@@ -114,6 +123,13 @@ It now shows:
 - mistake count
 - repair count
 - current selected move focus
+- Support Hub launcher
+- Support Hub summary for:
+  - due reminders
+  - current books
+  - active goals
+  - pinned cards
+  - critical goals
 - weakness heatmap by mistake category
 - unfinished game-analysis queue
 
@@ -124,6 +140,7 @@ Dashboard study lanes currently link to:
 - position vault
 - training mode
 - repair loop
+- Support Hub
 
 
 ==================================================
@@ -148,22 +165,12 @@ Current move metadata supported:
 - preferred repertoire move
 - do-not-train flag
 
-The live board shows:
-
-- current move
-- move type
-- position status
-- move explanation
-- board line
-
 
 ==================================================
 6. GAME ANALYSIS STUDIO
 ==================================================
 
-`games.html` is the new sprint module.
-
-Current capabilities:
+`games.html` currently supports:
 
 - paste PGN directly
 - import PGN from file
@@ -173,7 +180,7 @@ Current capabilities:
 - navigate start / previous / next / end
 - review a clickable move list
 
-Per-move human note fields currently supported:
+Per-move human note fields supported:
 
 - what I thought before the move
 - what I learned after the move
@@ -187,49 +194,27 @@ Per-move human note fields currently supported:
 - critical moment type
 - mistake flag
 
-Extraction actions from the currently selected move:
+Extraction actions from the selected move:
 
 1. save position card
 2. create mistake record
 3. create repair card
-
-The page also:
-
-- tries to link the imported game to the deepest matching opening-tree node
-- tracks game analysis status
-- stores overall game summary
-- allows deleting a stored game and its annotations
 
 
 ==================================================
 7. POSITION VAULT
 ==================================================
 
-`positions.html` is now the home for extracted positions.
-
-Current capabilities:
+`positions.html` currently supports:
 
 - list saved positions
 - filter by position type
 - search by title, themes, tags, or lesson text
 - display board from saved FEN
-- edit:
-  - title
-  - short question
-  - position type
-  - themes
-  - tags
-  - human evaluation
-  - best human move
-  - correct idea
-  - wrong idea
-  - lesson
-
-Cross-links currently supported:
-
-- open source game in `games.html`
-- open linked opening node in `editor.html`
-- open linked repair in `repair.html`
+- edit core lesson fields
+- open linked source game
+- open linked opening node
+- open linked repair
 
 
 ==================================================
@@ -238,7 +223,7 @@ Cross-links currently supported:
 
 `training.html` still trains the opening tree only.
 
-Current training flow:
+Current flow:
 
 1. choose color
 2. choose study root
@@ -249,12 +234,6 @@ Current training flow:
 7. reveal answer
 8. ask why
 9. continue line or jump to next line
-
-Training logic details:
-
-- preferred moves count as accepted answers when branches exist
-- moves marked do not train are skipped
-- black-root training still works when the root starts as something like `1...e5`
 
 
 ==================================================
@@ -273,16 +252,85 @@ Status values:
 - `needs_work`
 - `solved`
 
-New practical improvement:
 
-- Position Vault can now pass a linked repair into the repair page so the repair board opens on the correct item
+==================================================
+10. SUPPORT HUB
+==================================================
+
+`support.html` is the non-board support system around the chess work.
+
+Current capabilities:
+
+- command center with visible-now list
+- quick capture
+- support cards
+- goals board
+- in-app reminders
+- reading shelf
+- book notes tied to the selected book
+- tournament notes
+- quick ideas inbox
+
+Support card actions:
+
+- create
+- edit
+- delete
+- pin / unpin
+- archive / unarchive
+- review
+- random card
+- starter deck creation
+
+Goal actions:
+
+- create
+- edit
+- delete
+- progress tracking from current/target or manual percent
+- mark achieved
+- pause
+- reactivate
+
+Reminder actions:
+
+- create
+- edit
+- delete
+- mark done
+- snooze 1 day
+- snooze 1 week
+- archive
+- repeating due-date rollover
+
+Reading shelf actions:
+
+- create
+- edit
+- delete books
+- mark status
+- quick page-progress bump
+- create / edit / delete book notes
+
+Quick ideas actions:
+
+- create
+- edit
+- delete
+- archive
+- convert into:
+  - support card
+  - goal
+  - reminder
+  - book
+  - tournament note
 
 
 ==================================================
-10. BACKUP / EXPORT / IMPORT
+11. BACKUP / EXPORT / IMPORT
 ==================================================
 
-Current export formats now include:
+Current export formats include:
 
 1. full backup
    - `gm-brain-full-backup.json`
@@ -294,11 +342,18 @@ Current export formats now include:
    - `gm-brain-game-annotations.json`
    - `gm-brain-positions.json`
    - `gm-brain-mistakes.json`
+   - `gm-brain-support-cards.json`
+   - `gm-brain-goals.json`
+   - `gm-brain-app-reminders.json`
+   - `gm-brain-books.json`
+   - `gm-brain-book-notes.json`
+   - `gm-brain-tournament-notes.json`
+   - `gm-brain-quick-ideas.json`
 
 Entry behavior:
 
 - protected pages prompt once per session to export backups
-- prompt now includes opening nodes, repairs, games, and positions summary counts
+- the prompt includes support counts as well as the original chess-work counts
 
 Import behavior:
 
@@ -306,14 +361,15 @@ Import behavior:
 - supports old node-only arrays
 - supports older combined node/repair backups
 - supports single-table snapshots
-- supports the new full-backup format with all six collections
+- supports older six-collection full backups
+- supports the new 13-collection full backup format
 
 
 ==================================================
-11. SQL / REMOTE REQUIREMENT
+12. SQL / REMOTE REQUIREMENT
 ==================================================
 
-To sync the new sprint remotely, the user still needs to run:
+To sync the current build remotely, the user still needs to run:
 
 - `supabase/schema.sql`
 
@@ -323,6 +379,13 @@ That script now creates or upgrades:
 - `game_annotations`
 - `positions`
 - `mistakes`
+- `support_cards`
+- `goals`
+- `app_reminders`
+- `books`
+- `book_notes`
+- `tournament_notes`
+- `quick_ideas`
 
 If the SQL is not run yet:
 
@@ -332,7 +395,7 @@ If the SQL is not run yet:
 
 
 ==================================================
-12. WHAT THIS BUILD REALLY CHANGED
+13. WHAT THIS BUILD REALLY CHANGED
 ==================================================
 
 Before this sprint, the app could:
@@ -340,22 +403,18 @@ Before this sprint, the app could:
 - store opening moves
 - train opening moves
 - store repair notes
+- analyze games
+- extract positions and mistakes
 
 After this sprint, the app can now also:
 
-- import your own games
-- replay them without engine-first workflow
-- store what you were thinking move by move
-- mark critical moments
-- extract positions
-- extract mistakes
-- create repairs directly from game moments
-- surface repeated weakness categories on the dashboard
+- store goals and reminders
+- pin mindset / anti-tilt / principle cards
+- keep books and extraction notes
+- hold tournament preparation and reflection
+- capture and convert loose ideas
+- surface the non-board work on the dashboard
 
-This means the app has crossed the bridge from:
+This means the app is no longer only an opening and analysis workspace.
 
-- opening-tree workspace
-
-to:
-
-- early chess-brain workspace
+It is now a broader chess-brain workspace with a dedicated support layer around the board work.

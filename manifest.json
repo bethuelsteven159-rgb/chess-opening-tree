@@ -5,7 +5,7 @@
   "display": "standalone",
   "background_color": "#08111d",
   "theme_color": "#08111d",
-  "description": "A private chess brain workspace with opening editing, game analysis, a position vault, training, and repair loops.",
+  "description": "A private chess brain workspace with opening editing, game analysis, position vault, training, repair loops, goals, reminders, books, and support cards.",
   "icons": [
     {
       "src": "assets/icon.svg",
@@ -54,6 +54,13 @@
       "short_name": "Repair",
       "description": "Review and update your mistake-to-lesson repair queue.",
       "url": "repair.html",
+      "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Support Hub",
+      "short_name": "Support",
+      "description": "Open goals, reminders, books, and support cards.",
+      "url": "support.html",
       "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
     }
   ]

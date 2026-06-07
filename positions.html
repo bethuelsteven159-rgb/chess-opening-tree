@@ -12,7 +12,7 @@
   <script>
     document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
   </script>
-  <link rel="stylesheet" href="styles.css?v=15" />
+  <link rel="stylesheet" href="styles.css" />
   <script src="vendor/supabase-js.min.js"></script>
   <script src="vendor/chess.min.js"></script>
 </head>
@@ -38,6 +38,7 @@
         <a class="nav-link is-current" href="positions.html">Positions</a>
         <a class="nav-link" href="training.html">Training</a>
         <a class="nav-link" href="repair.html">Repair</a>
+        <a class="nav-link" href="support.html">Support</a>
       </div>
 
       <div class="nav-actions">
@@ -253,7 +254,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
-  <script type="module" src="./js/positions.js?v=15"></script>
+  <script type="module" src="./js/positions.js"></script>
   <script>
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
   </script>

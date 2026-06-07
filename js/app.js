@@ -9,6 +9,10 @@ import {
   renderBoardSquares,
   splitMoveParts
 } from "./board-tools.js";
+import {
+  isReminderDue,
+  supportCommandItems
+} from "./support-utils.js";
 import { bindImportButton, initPageChrome } from "./ui-shell.js";
 
 await requireOnlyMe();
@@ -28,6 +32,13 @@ let games = [];
 let gameAnnotations = [];
 let positions = [];
 let mistakes = [];
+let supportCards = [];
+let goals = [];
+let appReminders = [];
+let books = [];
+let bookNotes = [];
+let tournamentNotes = [];
+let quickIdeas = [];
 let selectedId = loadSelectedNodeId();
 let selectedRepairId = loadSelectedRepairId();
 let trainingState = {
@@ -292,6 +303,10 @@ function renderStats() {
   const openMistakes = mistakes.length;
   const analyzedGames = games.length;
   const storedPositions = positions.length;
+  const activeGoals = goals.filter(goal => goal.status === "active");
+  const dueReminders = appReminders.filter(isReminderDue);
+  const currentBooks = books.filter(book => book.status === "currently_reading");
+  const pinnedCards = supportCards.filter(card => card.status === "active" && card.pinned);
 
   setText("nodeCount", String(nodes.length));
   setText("lineCount", String(rootLines));
@@ -306,6 +321,11 @@ function renderStats() {
   setText("dashboardPositionCount", `${storedPositions} positions`);
   setText("dashboardTrainerCount", `${trainerPositions} prompts`);
   setText("dashboardRepairCount", `${openRepairs} open`);
+  setText("dashboardSupportCount", `${activeGoals.length} goals • ${dueReminders.length} due`);
+  setText("dashboardDueReminderCount", `${dueReminders.length} due reminder${dueReminders.length === 1 ? "" : "s"}`);
+  setText("dashboardCurrentBooksCount", `${currentBooks.length} current book${currentBooks.length === 1 ? "" : "s"}`);
+  setText("dashboardActiveGoalsCount", `${activeGoals.length} active goal${activeGoals.length === 1 ? "" : "s"}`);
+  setText("dashboardPinnedCardsCount", `${pinnedCards.length} pinned card${pinnedCards.length === 1 ? "" : "s"}`);
   setText("repairOpenCount", `${openRepairs} open`);
 }
 
@@ -391,6 +411,36 @@ function renderDashboardGameQueue() {
       </button>
     `;
   }).join("") || `<div class="line-empty">No games in the queue yet. Import a PGN in Game Analysis Studio and the dashboard will surface unfinished work here.</div>`;
+}
+
+function renderDashboardSupportSummary() {
+  const host = $("dashboardSupportSummary");
+  if (!host) return;
+
+  const items = supportCommandItems({
+    supportCards,
+    goals,
+    reminders: appReminders,
+    books
+  }).slice(0, 6);
+  const criticalGoals = goals.filter(goal => goal.status === "active" && goal.priority === "critical").length;
+
+  setText("dashboardSupportCriticalGoals", `${criticalGoals} critical goal${criticalGoals === 1 ? "" : "s"}`);
+
+  if (!items.length) {
+    host.innerHTML = `<div class="line-empty">No support items yet. Add goals, reminders, books, or cards in the Support Hub.</div>`;
+    return;
+  }
+
+  host.innerHTML = items.map(item => `
+    <article class="heatmap-row support-summary-row">
+      <div>
+        <strong>${escapeHtml(item.title)}</strong>
+        <p class="muted">${escapeHtml(item.meta || "Visible in the Support Hub")}</p>
+      </div>
+      <span class="mini-tag">${escapeHtml(item.kind.replace(/_/g, " "))}</span>
+    </article>
+  `).join("");
 }
 
 function renderLiveBoard() {
@@ -1432,6 +1482,7 @@ function paint() {
   renderDashboardFocus();
   renderDashboardHeatmap();
   renderDashboardGameQueue();
+  renderDashboardSupportSummary();
   renderLiveBoard();
   paintTrainer();
   renderRepairFocus();
@@ -1444,13 +1495,20 @@ function paint() {
 }
 
 async function refresh() {
-  [nodes, repairs, games, gameAnnotations, positions, mistakes] = await Promise.all([
+  [nodes, repairs, games, gameAnnotations, positions, mistakes, supportCards, goals, appReminders, books, bookNotes, tournamentNotes, quickIdeas] = await Promise.all([
     OpeningDB.loadNodes(),
     OpeningDB.loadRepairItems(),
     OpeningDB.loadGames(),
     OpeningDB.loadGameAnnotations(),
     OpeningDB.loadPositions(),
-    OpeningDB.loadMistakes()
+    OpeningDB.loadMistakes(),
+    OpeningDB.loadSupportCards(),
+    OpeningDB.loadGoals(),
+    OpeningDB.loadAppReminders(),
+    OpeningDB.loadBooks(),
+    OpeningDB.loadBookNotes(),
+    OpeningDB.loadTournamentNotes(),
+    OpeningDB.loadQuickIdeas()
   ]);
 
   if (selectedId && !nodeById(selectedId)) {
@@ -1482,14 +1540,21 @@ async function refresh() {
 
 function backupPayload() {
   return {
-    version: 6,
+    version: 7,
     exported_at: new Date().toISOString(),
     nodes,
     repairs,
     games,
     game_annotations: gameAnnotations,
     positions,
-    mistakes
+    mistakes,
+    support_cards: supportCards,
+    goals,
+    app_reminders: appReminders,
+    books,
+    book_notes: bookNotes,
+    tournament_notes: tournamentNotes,
+    quick_ideas: quickIdeas
   };
 }
 
@@ -1547,6 +1612,69 @@ function mistakesPayload() {
   };
 }
 
+function supportCardsPayload() {
+  return {
+    table: window.APP_CONFIG?.SUPPORT_CARDS_TABLE_NAME || "support_cards",
+    exported_at: new Date().toISOString(),
+    count: supportCards.length,
+    rows: supportCards
+  };
+}
+
+function goalsPayload() {
+  return {
+    table: window.APP_CONFIG?.GOALS_TABLE_NAME || "goals",
+    exported_at: new Date().toISOString(),
+    count: goals.length,
+    rows: goals
+  };
+}
+
+function appRemindersPayload() {
+  return {
+    table: window.APP_CONFIG?.APP_REMINDERS_TABLE_NAME || "app_reminders",
+    exported_at: new Date().toISOString(),
+    count: appReminders.length,
+    rows: appReminders
+  };
+}
+
+function booksPayload() {
+  return {
+    table: window.APP_CONFIG?.BOOKS_TABLE_NAME || "books",
+    exported_at: new Date().toISOString(),
+    count: books.length,
+    rows: books
+  };
+}
+
+function bookNotesPayload() {
+  return {
+    table: window.APP_CONFIG?.BOOK_NOTES_TABLE_NAME || "book_notes",
+    exported_at: new Date().toISOString(),
+    count: bookNotes.length,
+    rows: bookNotes
+  };
+}
+
+function tournamentNotesPayload() {
+  return {
+    table: window.APP_CONFIG?.TOURNAMENT_NOTES_TABLE_NAME || "tournament_notes",
+    exported_at: new Date().toISOString(),
+    count: tournamentNotes.length,
+    rows: tournamentNotes
+  };
+}
+
+function quickIdeasPayload() {
+  return {
+    table: window.APP_CONFIG?.QUICK_IDEAS_TABLE_NAME || "quick_ideas",
+    exported_at: new Date().toISOString(),
+    count: quickIdeas.length,
+    rows: quickIdeas
+  };
+}
+
 function exportOpeningNodesJson() {
   downloadJsonFile("gm-opening-tree-opening-nodes.json", openingNodesPayload());
   showToast("Opening nodes exported.");
@@ -1577,6 +1705,41 @@ function exportMistakesJson() {
   showToast("Mistakes exported.");
 }
 
+function exportSupportCardsJson() {
+  downloadJsonFile("gm-brain-support-cards.json", supportCardsPayload());
+  showToast("Support cards exported.");
+}
+
+function exportGoalsJson() {
+  downloadJsonFile("gm-brain-goals.json", goalsPayload());
+  showToast("Goals exported.");
+}
+
+function exportAppRemindersJson() {
+  downloadJsonFile("gm-brain-app-reminders.json", appRemindersPayload());
+  showToast("App reminders exported.");
+}
+
+function exportBooksJson() {
+  downloadJsonFile("gm-brain-books.json", booksPayload());
+  showToast("Books exported.");
+}
+
+function exportBookNotesJson() {
+  downloadJsonFile("gm-brain-book-notes.json", bookNotesPayload());
+  showToast("Book notes exported.");
+}
+
+function exportTournamentNotesJson() {
+  downloadJsonFile("gm-brain-tournament-notes.json", tournamentNotesPayload());
+  showToast("Tournament notes exported.");
+}
+
+function exportQuickIdeasJson() {
+  downloadJsonFile("gm-brain-quick-ideas.json", quickIdeasPayload());
+  showToast("Quick ideas exported.");
+}
+
 function exportFullBackupJson() {
   downloadJsonFile("gm-brain-full-backup.json", backupPayload());
   showToast("Full backup exported.");
@@ -1590,7 +1753,14 @@ function exportAllSafetyBackups() {
     exportGamesJson,
     exportGameAnnotationsJson,
     exportPositionsJson,
-    exportMistakesJson
+    exportMistakesJson,
+    exportSupportCardsJson,
+    exportGoalsJson,
+    exportAppRemindersJson,
+    exportBooksJson,
+    exportBookNotesJson,
+    exportTournamentNotesJson,
+    exportQuickIdeasJson
   ];
 
   tasks.forEach((task, index) => {
@@ -1610,13 +1780,17 @@ function ensureBackupPrompt() {
       <p class="eyebrow">Safety export</p>
       <h3 id="backupPromptTitle">Download your full backup before you work.</h3>
       <p class="muted">
-        This quick safety step exports one full JSON restore file plus the current table snapshots for moves, repairs, games, annotations, positions, and mistakes.
+        This quick safety step exports one full JSON restore file plus the current table snapshots for moves, repairs, games, annotations, positions, mistakes, and the Support Hub collections.
       </p>
       <div class="backup-prompt-meta">
         <span id="backupPromptNodeCount" class="status-pill">0 opening nodes</span>
         <span id="backupPromptRepairCount" class="status-pill">0 repair items</span>
         <span id="backupPromptGameCount" class="status-pill">0 games</span>
         <span id="backupPromptPositionCount" class="status-pill">0 positions</span>
+        <span id="backupPromptSupportCardCount" class="status-pill">0 support cards</span>
+        <span id="backupPromptGoalCount" class="status-pill">0 active goals</span>
+        <span id="backupPromptReminderCount" class="status-pill">0 reminders</span>
+        <span id="backupPromptBookCount" class="status-pill">0 books</span>
       </div>
       <div class="backup-prompt-actions">
         <button id="backupExportAllBtn" class="button button-primary" type="button">Export everything now</button>
@@ -1641,6 +1815,13 @@ function ensureBackupPrompt() {
     window.setTimeout(() => exportGameAnnotationsJson(), 360);
     window.setTimeout(() => exportPositionsJson(), 480);
     window.setTimeout(() => exportMistakesJson(), 600);
+    window.setTimeout(() => exportSupportCardsJson(), 720);
+    window.setTimeout(() => exportGoalsJson(), 840);
+    window.setTimeout(() => exportAppRemindersJson(), 960);
+    window.setTimeout(() => exportBooksJson(), 1080);
+    window.setTimeout(() => exportBookNotesJson(), 1200);
+    window.setTimeout(() => exportTournamentNotesJson(), 1320);
+    window.setTimeout(() => exportQuickIdeasJson(), 1440);
   });
   $("backupDismissBtn")?.addEventListener("click", hideBackupPrompt);
   dialog.addEventListener("click", event => {
@@ -1656,6 +1837,10 @@ function showBackupPrompt() {
   setText("backupPromptRepairCount", `${repairs.length} repair item${repairs.length === 1 ? "" : "s"}`);
   setText("backupPromptGameCount", `${games.length} game${games.length === 1 ? "" : "s"}`);
   setText("backupPromptPositionCount", `${positions.length} position${positions.length === 1 ? "" : "s"}`);
+  setText("backupPromptSupportCardCount", `${supportCards.length} support card${supportCards.length === 1 ? "" : "s"}`);
+  setText("backupPromptGoalCount", `${goals.filter(goal => goal.status === "active").length} active goal${goals.filter(goal => goal.status === "active").length === 1 ? "" : "s"}`);
+  setText("backupPromptReminderCount", `${appReminders.length} reminder${appReminders.length === 1 ? "" : "s"}`);
+  setText("backupPromptBookCount", `${books.length} book${books.length === 1 ? "" : "s"}`);
   dialog.classList.remove("hidden");
   sessionStorage.setItem(BACKUP_PROMPT_SESSION_KEY, "seen");
 }
@@ -1679,7 +1864,14 @@ function parseImportedBackup(text) {
       games,
       gameAnnotations,
       positions,
-      mistakes
+      mistakes,
+      supportCards,
+      goals,
+      appReminders,
+      books,
+      bookNotes,
+      tournamentNotes,
+      quickIdeas
     };
   }
 
@@ -1694,7 +1886,14 @@ function parseImportedBackup(text) {
       games,
       gameAnnotations,
       positions,
-      mistakes
+      mistakes,
+      supportCards,
+      goals,
+      appReminders,
+      books,
+      bookNotes,
+      tournamentNotes,
+      quickIdeas
     };
   }
 
@@ -1705,7 +1904,14 @@ function parseImportedBackup(text) {
       games,
       gameAnnotations,
       positions,
-      mistakes
+      mistakes,
+      supportCards,
+      goals,
+      appReminders,
+      books,
+      bookNotes,
+      tournamentNotes,
+      quickIdeas
     };
   }
 
@@ -1716,7 +1922,14 @@ function parseImportedBackup(text) {
       games: parsed.rows.map(OpeningDB.normalizeGame),
       gameAnnotations,
       positions,
-      mistakes
+      mistakes,
+      supportCards,
+      goals,
+      appReminders,
+      books,
+      bookNotes,
+      tournamentNotes,
+      quickIdeas
     };
   }
 
@@ -1727,7 +1940,14 @@ function parseImportedBackup(text) {
       games,
       gameAnnotations: parsed.rows.map(OpeningDB.normalizeGameAnnotation),
       positions,
-      mistakes
+      mistakes,
+      supportCards,
+      goals,
+      appReminders,
+      books,
+      bookNotes,
+      tournamentNotes,
+      quickIdeas
     };
   }
 
@@ -1738,7 +1958,14 @@ function parseImportedBackup(text) {
       games,
       gameAnnotations,
       positions: parsed.rows.map(OpeningDB.normalizePosition),
-      mistakes
+      mistakes,
+      supportCards,
+      goals,
+      appReminders,
+      books,
+      bookNotes,
+      tournamentNotes,
+      quickIdeas
     };
   }
 
@@ -1749,7 +1976,140 @@ function parseImportedBackup(text) {
       games,
       gameAnnotations,
       positions,
-      mistakes: parsed.rows.map(OpeningDB.normalizeMistake)
+      mistakes: parsed.rows.map(OpeningDB.normalizeMistake),
+      supportCards,
+      goals,
+      appReminders,
+      books,
+      bookNotes,
+      tournamentNotes,
+      quickIdeas
+    };
+  }
+
+  if (parsed.table === (window.APP_CONFIG?.SUPPORT_CARDS_TABLE_NAME || "support_cards") && Array.isArray(parsed.rows)) {
+    return {
+      nodes,
+      repairs,
+      games,
+      gameAnnotations,
+      positions,
+      mistakes,
+      supportCards: parsed.rows.map(OpeningDB.normalizeSupportCard),
+      goals,
+      appReminders,
+      books,
+      bookNotes,
+      tournamentNotes,
+      quickIdeas
+    };
+  }
+
+  if (parsed.table === (window.APP_CONFIG?.GOALS_TABLE_NAME || "goals") && Array.isArray(parsed.rows)) {
+    return {
+      nodes,
+      repairs,
+      games,
+      gameAnnotations,
+      positions,
+      mistakes,
+      supportCards,
+      goals: parsed.rows.map(OpeningDB.normalizeGoal),
+      appReminders,
+      books,
+      bookNotes,
+      tournamentNotes,
+      quickIdeas
+    };
+  }
+
+  if (parsed.table === (window.APP_CONFIG?.APP_REMINDERS_TABLE_NAME || "app_reminders") && Array.isArray(parsed.rows)) {
+    return {
+      nodes,
+      repairs,
+      games,
+      gameAnnotations,
+      positions,
+      mistakes,
+      supportCards,
+      goals,
+      appReminders: parsed.rows.map(OpeningDB.normalizeAppReminder),
+      books,
+      bookNotes,
+      tournamentNotes,
+      quickIdeas
+    };
+  }
+
+  if (parsed.table === (window.APP_CONFIG?.BOOKS_TABLE_NAME || "books") && Array.isArray(parsed.rows)) {
+    return {
+      nodes,
+      repairs,
+      games,
+      gameAnnotations,
+      positions,
+      mistakes,
+      supportCards,
+      goals,
+      appReminders,
+      books: parsed.rows.map(OpeningDB.normalizeBook),
+      bookNotes,
+      tournamentNotes,
+      quickIdeas
+    };
+  }
+
+  if (parsed.table === (window.APP_CONFIG?.BOOK_NOTES_TABLE_NAME || "book_notes") && Array.isArray(parsed.rows)) {
+    return {
+      nodes,
+      repairs,
+      games,
+      gameAnnotations,
+      positions,
+      mistakes,
+      supportCards,
+      goals,
+      appReminders,
+      books,
+      bookNotes: parsed.rows.map(OpeningDB.normalizeBookNote),
+      tournamentNotes,
+      quickIdeas
+    };
+  }
+
+  if (parsed.table === (window.APP_CONFIG?.TOURNAMENT_NOTES_TABLE_NAME || "tournament_notes") && Array.isArray(parsed.rows)) {
+    return {
+      nodes,
+      repairs,
+      games,
+      gameAnnotations,
+      positions,
+      mistakes,
+      supportCards,
+      goals,
+      appReminders,
+      books,
+      bookNotes,
+      tournamentNotes: parsed.rows.map(OpeningDB.normalizeTournamentNote),
+      quickIdeas
+    };
+  }
+
+  if (parsed.table === (window.APP_CONFIG?.QUICK_IDEAS_TABLE_NAME || "quick_ideas") && Array.isArray(parsed.rows)) {
+    return {
+      nodes,
+      repairs,
+      games,
+      gameAnnotations,
+      positions,
+      mistakes,
+      supportCards,
+      goals,
+      appReminders,
+      books,
+      bookNotes,
+      tournamentNotes,
+      quickIdeas: parsed.rows.map(OpeningDB.normalizeQuickIdea)
     };
   }
 
@@ -1771,7 +2131,16 @@ function parseImportedBackup(text) {
       ? parsed.game_annotations.map(OpeningDB.normalizeGameAnnotation)
       : gameAnnotations,
     positions: Array.isArray(parsed.positions) ? parsed.positions.map(OpeningDB.normalizePosition) : positions,
-    mistakes: Array.isArray(parsed.mistakes) ? parsed.mistakes.map(OpeningDB.normalizeMistake) : mistakes
+    mistakes: Array.isArray(parsed.mistakes) ? parsed.mistakes.map(OpeningDB.normalizeMistake) : mistakes,
+    supportCards: Array.isArray(parsed.support_cards) ? parsed.support_cards.map(OpeningDB.normalizeSupportCard) : supportCards,
+    goals: Array.isArray(parsed.goals) ? parsed.goals.map(OpeningDB.normalizeGoal) : goals,
+    appReminders: Array.isArray(parsed.app_reminders) ? parsed.app_reminders.map(OpeningDB.normalizeAppReminder) : appReminders,
+    books: Array.isArray(parsed.books) ? parsed.books.map(OpeningDB.normalizeBook) : books,
+    bookNotes: Array.isArray(parsed.book_notes) ? parsed.book_notes.map(OpeningDB.normalizeBookNote) : bookNotes,
+    tournamentNotes: Array.isArray(parsed.tournament_notes)
+      ? parsed.tournament_notes.map(OpeningDB.normalizeTournamentNote)
+      : tournamentNotes,
+    quickIdeas: Array.isArray(parsed.quick_ideas) ? parsed.quick_ideas.map(OpeningDB.normalizeQuickIdea) : quickIdeas
   };
 }
 
@@ -2142,6 +2511,13 @@ if (importBtn && importInput) {
       await OpeningDB.saveAllGameAnnotations(imported.gameAnnotations, { allowEmpty: true });
       await OpeningDB.saveAllPositions(imported.positions, { allowEmpty: true });
       await OpeningDB.saveAllMistakes(imported.mistakes, { allowEmpty: true });
+      await OpeningDB.saveAllSupportCards(imported.supportCards, { allowEmpty: true });
+      await OpeningDB.saveAllGoals(imported.goals, { allowEmpty: true });
+      await OpeningDB.saveAllAppReminders(imported.appReminders, { allowEmpty: true });
+      await OpeningDB.saveAllBooks(imported.books, { allowEmpty: true });
+      await OpeningDB.saveAllBookNotes(imported.bookNotes, { allowEmpty: true });
+      await OpeningDB.saveAllTournamentNotes(imported.tournamentNotes, { allowEmpty: true });
+      await OpeningDB.saveAllQuickIdeas(imported.quickIdeas, { allowEmpty: true });
       setSelectedNodeId(null);
       setSelectedRepairId(null);
       trainingState.prompt = null;

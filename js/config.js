@@ -11,5 +11,12 @@ window.APP_CONFIG = {
   GAMES_TABLE_NAME: "games",
   GAME_ANNOTATIONS_TABLE_NAME: "game_annotations",
   POSITIONS_TABLE_NAME: "positions",
-  MISTAKES_TABLE_NAME: "mistakes"
+  MISTAKES_TABLE_NAME: "mistakes",
+  SUPPORT_CARDS_TABLE_NAME: "support_cards",
+  GOALS_TABLE_NAME: "goals",
+  APP_REMINDERS_TABLE_NAME: "app_reminders",
+  BOOKS_TABLE_NAME: "books",
+  BOOK_NOTES_TABLE_NAME: "book_notes",
+  TOURNAMENT_NOTES_TABLE_NAME: "tournament_notes",
+  QUICK_IDEAS_TABLE_NAME: "quick_ideas"
 };

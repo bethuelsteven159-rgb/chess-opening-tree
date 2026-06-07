@@ -1,4 +1,4 @@
-const CACHE_NAME = "gm-opening-tree-v10";
+const CACHE_NAME = "gm-opening-tree-v11";
 const ASSETS = [
   "./",
   "index.html",
@@ -7,6 +7,7 @@ const ASSETS = [
   "positions.html",
   "training.html",
   "repair.html",
+  "support.html",
   "random.html",
   "login.html",
   "styles.css",
@@ -16,10 +17,12 @@ const ASSETS = [
   "js/db.js",
   "js/board-tools.js",
   "js/chess-brain-utils.js",
+  "js/support-utils.js",
   "js/ui-shell.js",
   "js/app.js",
   "js/games.js",
   "js/positions.js",
+  "js/support.js",
   "js/auth/login.js",
   "js/auth/only-me-guard.js",
   "vendor/supabase-js.min.js",

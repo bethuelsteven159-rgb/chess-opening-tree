@@ -5,18 +5,39 @@ const GAME_STORAGE_KEY = "gm_opening_tree_games_v1";
 const GAME_ANNOTATION_STORAGE_KEY = "gm_opening_tree_game_annotations_v1";
 const POSITION_STORAGE_KEY = "gm_opening_tree_positions_v1";
 const MISTAKE_STORAGE_KEY = "gm_opening_tree_mistakes_v1";
+const SUPPORT_CARD_STORAGE_KEY = "gm_opening_tree_support_cards_v1";
+const GOAL_STORAGE_KEY = "gm_opening_tree_goals_v1";
+const APP_REMINDER_STORAGE_KEY = "gm_opening_tree_app_reminders_v1";
+const BOOK_STORAGE_KEY = "gm_opening_tree_books_v1";
+const BOOK_NOTE_STORAGE_KEY = "gm_opening_tree_book_notes_v1";
+const TOURNAMENT_NOTE_STORAGE_KEY = "gm_opening_tree_tournament_notes_v1";
+const QUICK_IDEA_STORAGE_KEY = "gm_opening_tree_quick_ideas_v1";
 const NODE_SNAPSHOT_KEY = "gm_opening_tree_local_snapshot_v1";
 const REPAIR_SNAPSHOT_KEY = "gm_opening_tree_repairs_snapshot_v1";
 const GAME_SNAPSHOT_KEY = "gm_opening_tree_games_snapshot_v1";
 const GAME_ANNOTATION_SNAPSHOT_KEY = "gm_opening_tree_game_annotations_snapshot_v1";
 const POSITION_SNAPSHOT_KEY = "gm_opening_tree_positions_snapshot_v1";
 const MISTAKE_SNAPSHOT_KEY = "gm_opening_tree_mistakes_snapshot_v1";
+const SUPPORT_CARD_SNAPSHOT_KEY = "gm_opening_tree_support_cards_snapshot_v1";
+const GOAL_SNAPSHOT_KEY = "gm_opening_tree_goals_snapshot_v1";
+const APP_REMINDER_SNAPSHOT_KEY = "gm_opening_tree_app_reminders_snapshot_v1";
+const BOOK_SNAPSHOT_KEY = "gm_opening_tree_books_snapshot_v1";
+const BOOK_NOTE_SNAPSHOT_KEY = "gm_opening_tree_book_notes_snapshot_v1";
+const TOURNAMENT_NOTE_SNAPSHOT_KEY = "gm_opening_tree_tournament_notes_snapshot_v1";
+const QUICK_IDEA_SNAPSHOT_KEY = "gm_opening_tree_quick_ideas_snapshot_v1";
 const PENDING_NODE_SYNC_KEY = "gm_opening_tree_nodes_pending_sync_v1";
 const PENDING_REPAIR_SYNC_KEY = "gm_opening_tree_repairs_pending_sync_v1";
 const PENDING_GAME_SYNC_KEY = "gm_opening_tree_games_pending_sync_v1";
 const PENDING_GAME_ANNOTATION_SYNC_KEY = "gm_opening_tree_game_annotations_pending_sync_v1";
 const PENDING_POSITION_SYNC_KEY = "gm_opening_tree_positions_pending_sync_v1";
 const PENDING_MISTAKE_SYNC_KEY = "gm_opening_tree_mistakes_pending_sync_v1";
+const PENDING_SUPPORT_CARD_SYNC_KEY = "gm_opening_tree_support_cards_pending_sync_v1";
+const PENDING_GOAL_SYNC_KEY = "gm_opening_tree_goals_pending_sync_v1";
+const PENDING_APP_REMINDER_SYNC_KEY = "gm_opening_tree_app_reminders_pending_sync_v1";
+const PENDING_BOOK_SYNC_KEY = "gm_opening_tree_books_pending_sync_v1";
+const PENDING_BOOK_NOTE_SYNC_KEY = "gm_opening_tree_book_notes_pending_sync_v1";
+const PENDING_TOURNAMENT_NOTE_SYNC_KEY = "gm_opening_tree_tournament_notes_pending_sync_v1";
+const PENDING_QUICK_IDEA_SYNC_KEY = "gm_opening_tree_quick_ideas_pending_sync_v1";
 
 const supportCache = new Map();
 
@@ -54,6 +75,34 @@ const MISTAKE_CATEGORY_VALUES = [
 
 const MISTAKE_SEVERITY_VALUES = ["small", "medium", "serious", "game_losing"];
 const GAME_PHASE_VALUES = ["opening", "middlegame", "endgame"];
+const SUPPORT_CARD_TYPE_VALUES = ["identity", "principle", "quote", "anti_tilt", "advice", "checklist", "mindset", "study_rule", "tournament", "note"];
+const SUPPORT_CARD_CATEGORY_VALUES = ["vision", "discipline", "emotional_control", "study_process", "tournament_strength", "confidence", "recovery", "other"];
+const SUPPORT_PRIORITY_VALUES = ["low", "normal", "high", "critical"];
+const GOAL_TYPE_VALUES = ["ultimate", "annual", "quarterly", "monthly", "rating", "tournament", "book", "process", "mindset", "custom"];
+const GOAL_STATUS_VALUES = ["not_started", "active", "paused", "achieved", "abandoned"];
+const REMINDER_TYPE_VALUES = ["goal", "book", "tournament", "admin", "mindset", "review", "custom"];
+const REMINDER_REPEAT_VALUES = ["none", "daily", "weekly", "monthly", "custom_days"];
+const REMINDER_STATUS_VALUES = ["active", "done", "snoozed", "archived"];
+const REMINDER_WEEKDAY_VALUES = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const BOOK_FORMAT_VALUES = ["book", "pdf", "course", "video_series", "article", "website", "other"];
+const BOOK_STATUS_VALUES = ["want_to_read", "currently_reading", "paused", "finished", "dropped", "reference"];
+const BOOK_AREA_VALUES = [
+  "opening",
+  "middlegame",
+  "endgame",
+  "tactics",
+  "calculation",
+  "strategy",
+  "game_collection",
+  "psychology",
+  "tournament_play",
+  "biography",
+  "general",
+  "other"
+];
+const TOURNAMENT_STATUS_VALUES = ["planned", "active", "completed", "cancelled"];
+const QUICK_IDEA_TYPE_VALUES = ["general", "opening", "training", "book", "mindset", "tournament", "app_improvement", "other"];
+const QUICK_IDEA_STATUS_VALUES = ["inbox", "converted", "archived"];
 
 const seedNodes = [
   {
@@ -160,6 +209,47 @@ function getClient() {
 
 function normalizeTags(tags) {
   return Array.isArray(tags) ? tags.map(tag => String(tag || "").trim()).filter(Boolean) : [];
+}
+
+function normalizeText(value) {
+  return String(value || "").trim();
+}
+
+function normalizeDateKey(value) {
+  return String(value || "").trim().slice(0, 10);
+}
+
+function normalizeOptionalDateTime(value) {
+  const text = String(value || "").trim();
+  return text || null;
+}
+
+function normalizeStringArray(values) {
+  return Array.isArray(values) ? values.map(value => String(value || "").trim()).filter(Boolean) : [];
+}
+
+function normalizeIdArray(values) {
+  return normalizeStringArray(values);
+}
+
+function normalizeNumberOrNull(value) {
+  if (value === "" || value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeIntegerOrNull(value, options = {}) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return null;
+  if (options.min !== undefined && parsed < options.min) return null;
+  if (options.max !== undefined && parsed > options.max) return null;
+  return parsed;
+}
+
+function clampNumber(value, min, max) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(min, Math.min(max, parsed));
 }
 
 function normalizeNode(node) {
@@ -321,6 +411,159 @@ function normalizeMistake(mistake) {
   };
 }
 
+function normalizeSupportCard(card) {
+  return {
+    id: card.id || crypto.randomUUID(),
+    title: normalizeText(card.title),
+    body: normalizeText(card.body),
+    card_type: normalizeChoice(card.card_type, SUPPORT_CARD_TYPE_VALUES, "note"),
+    category: normalizeChoice(card.category, SUPPORT_CARD_CATEGORY_VALUES, "other"),
+    pinned: card.pinned === true,
+    priority: normalizeChoice(card.priority, SUPPORT_PRIORITY_VALUES, "normal"),
+    tags: normalizeTags(card.tags),
+    source: normalizeText(card.source),
+    source_url: normalizeText(card.source_url),
+    status: normalizeChoice(card.status, ["active", "archived"], "active"),
+    created_at: card.created_at || new Date().toISOString(),
+    updated_at: card.updated_at || new Date().toISOString(),
+    last_reviewed_at: normalizeOptionalDateTime(card.last_reviewed_at),
+    review_count: Math.max(0, normalizeIntegerOrNull(card.review_count, { min: 0 }) || 0)
+  };
+}
+
+function normalizeGoal(goal) {
+  return {
+    id: goal.id || crypto.randomUUID(),
+    title: normalizeText(goal.title),
+    goal_type: normalizeChoice(goal.goal_type, GOAL_TYPE_VALUES, "custom"),
+    description: normalizeText(goal.description),
+    why: normalizeText(goal.why),
+    success_criteria: normalizeText(goal.success_criteria),
+    current_value: normalizeNumberOrNull(goal.current_value),
+    target_value: normalizeNumberOrNull(goal.target_value),
+    unit: normalizeText(goal.unit),
+    manual_progress_percent: clampNumber(goal.manual_progress_percent, 0, 100),
+    target_date: normalizeDateKey(goal.target_date),
+    status: normalizeChoice(goal.status, GOAL_STATUS_VALUES, "active"),
+    priority: normalizeChoice(goal.priority, SUPPORT_PRIORITY_VALUES, "normal"),
+    parent_goal_id: goal.parent_goal_id || null,
+    linked_book_id: goal.linked_book_id || null,
+    linked_support_card_ids: normalizeIdArray(goal.linked_support_card_ids),
+    tags: normalizeTags(goal.tags),
+    created_at: goal.created_at || new Date().toISOString(),
+    updated_at: goal.updated_at || new Date().toISOString(),
+    completed_at: normalizeOptionalDateTime(goal.completed_at),
+    last_touched_at: normalizeOptionalDateTime(goal.last_touched_at)
+  };
+}
+
+function normalizeAppReminder(reminder) {
+  return {
+    id: reminder.id || crypto.randomUUID(),
+    title: normalizeText(reminder.title),
+    note: normalizeText(reminder.note),
+    reminder_type: normalizeChoice(reminder.reminder_type, REMINDER_TYPE_VALUES, "custom"),
+    due_date: normalizeDateKey(reminder.due_date),
+    due_time: normalizeText(reminder.due_time),
+    repeat_rule: normalizeChoice(reminder.repeat_rule, REMINDER_REPEAT_VALUES, "none"),
+    repeat_interval: Math.max(1, normalizeIntegerOrNull(reminder.repeat_interval, { min: 1 }) || 1),
+    repeat_days: normalizeStringArray(reminder.repeat_days).filter(day => REMINDER_WEEKDAY_VALUES.includes(day)),
+    status: normalizeChoice(reminder.status, REMINDER_STATUS_VALUES, "active"),
+    snooze_until: normalizeDateKey(reminder.snooze_until),
+    priority: normalizeChoice(reminder.priority, SUPPORT_PRIORITY_VALUES, "normal"),
+    linked_goal_id: reminder.linked_goal_id || null,
+    linked_book_id: reminder.linked_book_id || null,
+    linked_support_card_id: reminder.linked_support_card_id || null,
+    tags: normalizeTags(reminder.tags),
+    created_at: reminder.created_at || new Date().toISOString(),
+    updated_at: reminder.updated_at || new Date().toISOString(),
+    completed_at: normalizeOptionalDateTime(reminder.completed_at)
+  };
+}
+
+function normalizeBook(book) {
+  return {
+    id: book.id || crypto.randomUUID(),
+    title: normalizeText(book.title),
+    author: normalizeText(book.author),
+    format: normalizeChoice(book.format, BOOK_FORMAT_VALUES, "book"),
+    status: normalizeChoice(book.status, BOOK_STATUS_VALUES, "want_to_read"),
+    area: normalizeChoice(book.area, BOOK_AREA_VALUES, "general"),
+    reason: normalizeText(book.reason),
+    what_it_teaches: normalizeText(book.what_it_teaches),
+    current_page: normalizeIntegerOrNull(book.current_page, { min: 0 }),
+    total_pages: normalizeIntegerOrNull(book.total_pages, { min: 1 }),
+    progress_percent: clampNumber(book.progress_percent, 0, 100),
+    started_at: normalizeDateKey(book.started_at),
+    target_finish_date: normalizeDateKey(book.target_finish_date),
+    finished_at: normalizeDateKey(book.finished_at),
+    rating: normalizeIntegerOrNull(book.rating, { min: 1, max: 5 }),
+    key_lessons: normalizeText(book.key_lessons),
+    action_items: normalizeText(book.action_items),
+    source_url: normalizeText(book.source_url),
+    file_label: normalizeText(book.file_label),
+    tags: normalizeTags(book.tags),
+    created_at: book.created_at || new Date().toISOString(),
+    updated_at: book.updated_at || new Date().toISOString()
+  };
+}
+
+function normalizeBookNote(note) {
+  return {
+    id: note.id || crypto.randomUUID(),
+    book_id: note.book_id || null,
+    title: normalizeText(note.title),
+    page: normalizeText(note.page),
+    chapter: normalizeText(note.chapter),
+    note: normalizeText(note.note),
+    lesson: normalizeText(note.lesson),
+    action_item: normalizeText(note.action_item),
+    tags: normalizeTags(note.tags),
+    linked_opening_node_id: note.linked_opening_node_id || null,
+    linked_position_id: note.linked_position_id || null,
+    linked_repair_id: note.linked_repair_id || null,
+    created_at: note.created_at || new Date().toISOString(),
+    updated_at: note.updated_at || new Date().toISOString()
+  };
+}
+
+function normalizeTournamentNote(note) {
+  return {
+    id: note.id || crypto.randomUUID(),
+    event_name: normalizeText(note.event_name),
+    event_date: normalizeDateKey(note.event_date),
+    event_location: normalizeText(note.event_location),
+    time_control: normalizeText(note.time_control),
+    section: normalizeText(note.section),
+    status: normalizeChoice(note.status, TOURNAMENT_STATUS_VALUES, "planned"),
+    pre_event_goal: normalizeText(note.pre_event_goal),
+    opening_focus: normalizeText(note.opening_focus),
+    mental_focus: normalizeText(note.mental_focus),
+    practical_checklist: normalizeText(note.practical_checklist),
+    round_notes: normalizeText(note.round_notes),
+    after_event_lessons: normalizeText(note.after_event_lessons),
+    linked_goal_id: note.linked_goal_id || null,
+    tags: normalizeTags(note.tags),
+    created_at: note.created_at || new Date().toISOString(),
+    updated_at: note.updated_at || new Date().toISOString()
+  };
+}
+
+function normalizeQuickIdea(idea) {
+  return {
+    id: idea.id || crypto.randomUUID(),
+    title: normalizeText(idea.title),
+    body: normalizeText(idea.body),
+    idea_type: normalizeChoice(idea.idea_type, QUICK_IDEA_TYPE_VALUES, "general"),
+    status: normalizeChoice(idea.status, QUICK_IDEA_STATUS_VALUES, "inbox"),
+    converted_to_type: normalizeText(idea.converted_to_type),
+    converted_to_id: normalizeText(idea.converted_to_id),
+    tags: normalizeTags(idea.tags),
+    created_at: idea.created_at || new Date().toISOString(),
+    updated_at: idea.updated_at || new Date().toISOString()
+  };
+}
+
 function readLocalJson(key) {
   const raw = localStorage.getItem(key);
   return raw ? JSON.parse(raw) : null;
@@ -478,6 +721,22 @@ function clearPendingMistakes() {
   clearLocalJson(PENDING_MISTAKE_SYNC_KEY);
 }
 
+function loadPendingFlatCollection(storageKey, normalizer) {
+  return readStoredArray(storageKey, normalizer);
+}
+
+function hasPendingFlatCollection(storageKey) {
+  return hasLocalJson(storageKey);
+}
+
+function markPendingFlatCollection(storageKey, items) {
+  writeLocalJson(storageKey, items);
+}
+
+function clearPendingFlatCollection(storageKey) {
+  clearLocalJson(storageKey);
+}
+
 function loadLocalNodes() {
   if (hasLocalJson(NODE_STORAGE_KEY)) {
     const clean = readStoredArray(NODE_STORAGE_KEY, normalizeNode);
@@ -536,6 +795,34 @@ function storeCurrentMistakes(items) {
   storeCurrentFlatCollection(MISTAKE_STORAGE_KEY, MISTAKE_SNAPSHOT_KEY, items);
 }
 
+function storeCurrentSupportCards(items) {
+  storeCurrentFlatCollection(SUPPORT_CARD_STORAGE_KEY, SUPPORT_CARD_SNAPSHOT_KEY, items);
+}
+
+function storeCurrentGoals(items) {
+  storeCurrentFlatCollection(GOAL_STORAGE_KEY, GOAL_SNAPSHOT_KEY, items);
+}
+
+function storeCurrentAppReminders(items) {
+  storeCurrentFlatCollection(APP_REMINDER_STORAGE_KEY, APP_REMINDER_SNAPSHOT_KEY, items);
+}
+
+function storeCurrentBooks(items) {
+  storeCurrentFlatCollection(BOOK_STORAGE_KEY, BOOK_SNAPSHOT_KEY, items);
+}
+
+function storeCurrentBookNotes(items) {
+  storeCurrentFlatCollection(BOOK_NOTE_STORAGE_KEY, BOOK_NOTE_SNAPSHOT_KEY, items);
+}
+
+function storeCurrentTournamentNotes(items) {
+  storeCurrentFlatCollection(TOURNAMENT_NOTE_STORAGE_KEY, TOURNAMENT_NOTE_SNAPSHOT_KEY, items);
+}
+
+function storeCurrentQuickIdeas(items) {
+  storeCurrentFlatCollection(QUICK_IDEA_STORAGE_KEY, QUICK_IDEA_SNAPSHOT_KEY, items);
+}
+
 function loadLocalGames() {
   return loadLocalFlatCollection(GAME_STORAGE_KEY, GAME_SNAPSHOT_KEY, normalizeGame, []);
 }
@@ -550,6 +837,34 @@ function loadLocalPositions() {
 
 function loadLocalMistakes() {
   return loadLocalFlatCollection(MISTAKE_STORAGE_KEY, MISTAKE_SNAPSHOT_KEY, normalizeMistake, []);
+}
+
+function loadLocalSupportCards() {
+  return loadLocalFlatCollection(SUPPORT_CARD_STORAGE_KEY, SUPPORT_CARD_SNAPSHOT_KEY, normalizeSupportCard, []);
+}
+
+function loadLocalGoals() {
+  return loadLocalFlatCollection(GOAL_STORAGE_KEY, GOAL_SNAPSHOT_KEY, normalizeGoal, []);
+}
+
+function loadLocalAppReminders() {
+  return loadLocalFlatCollection(APP_REMINDER_STORAGE_KEY, APP_REMINDER_SNAPSHOT_KEY, normalizeAppReminder, []);
+}
+
+function loadLocalBooks() {
+  return loadLocalFlatCollection(BOOK_STORAGE_KEY, BOOK_SNAPSHOT_KEY, normalizeBook, []);
+}
+
+function loadLocalBookNotes() {
+  return loadLocalFlatCollection(BOOK_NOTE_STORAGE_KEY, BOOK_NOTE_SNAPSHOT_KEY, normalizeBookNote, []);
+}
+
+function loadLocalTournamentNotes() {
+  return loadLocalFlatCollection(TOURNAMENT_NOTE_STORAGE_KEY, TOURNAMENT_NOTE_SNAPSHOT_KEY, normalizeTournamentNote, []);
+}
+
+function loadLocalQuickIdeas() {
+  return loadLocalFlatCollection(QUICK_IDEA_STORAGE_KEY, QUICK_IDEA_SNAPSHOT_KEY, normalizeQuickIdea, []);
 }
 
 function describeError(error) {
@@ -799,6 +1114,106 @@ async function loadMistakesFromRemote(client, table) {
   }
 
   return (data || []).map(normalizeMistake);
+}
+
+async function loadSupportCardsFromRemote(client, table) {
+  const { data, error } = await client
+    .from(table)
+    .select("*")
+    .order("pinned", { ascending: false })
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.error("Supabase support card load failed:", error);
+    throw error;
+  }
+
+  return (data || []).map(normalizeSupportCard);
+}
+
+async function loadGoalsFromRemote(client, table) {
+  const { data, error } = await client
+    .from(table)
+    .select("*")
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.error("Supabase goal load failed:", error);
+    throw error;
+  }
+
+  return (data || []).map(normalizeGoal);
+}
+
+async function loadAppRemindersFromRemote(client, table) {
+  const { data, error } = await client
+    .from(table)
+    .select("*")
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.error("Supabase reminder load failed:", error);
+    throw error;
+  }
+
+  return (data || []).map(normalizeAppReminder);
+}
+
+async function loadBooksFromRemote(client, table) {
+  const { data, error } = await client
+    .from(table)
+    .select("*")
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.error("Supabase book load failed:", error);
+    throw error;
+  }
+
+  return (data || []).map(normalizeBook);
+}
+
+async function loadBookNotesFromRemote(client, table) {
+  const { data, error } = await client
+    .from(table)
+    .select("*")
+    .order("book_id", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Supabase book note load failed:", error);
+    throw error;
+  }
+
+  return (data || []).map(normalizeBookNote);
+}
+
+async function loadTournamentNotesFromRemote(client, table) {
+  const { data, error } = await client
+    .from(table)
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Supabase tournament note load failed:", error);
+    throw error;
+  }
+
+  return (data || []).map(normalizeTournamentNote);
+}
+
+async function loadQuickIdeasFromRemote(client, table) {
+  const { data, error } = await client
+    .from(table)
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Supabase quick idea load failed:", error);
+    throw error;
+  }
+
+  return (data || []).map(normalizeQuickIdea);
 }
 
 async function syncNodesToRemote(client, table, clean, options = {}) {
@@ -1547,6 +1962,389 @@ async function deleteMistake(id) {
   return keptMistakes;
 }
 
+async function loadSupportCards() {
+  return loadRemoteBackedFlatCollection({
+    label: "Support cards",
+    table: window.APP_CONFIG?.SUPPORT_CARDS_TABLE_NAME || "support_cards",
+    remoteLoader: loadSupportCardsFromRemote,
+    loadLocal: loadLocalSupportCards,
+    loadPending: () => loadPendingFlatCollection(PENDING_SUPPORT_CARD_SYNC_KEY, normalizeSupportCard),
+    hasPending: () => hasPendingFlatCollection(PENDING_SUPPORT_CARD_SYNC_KEY),
+    storeCurrent: storeCurrentSupportCards,
+    clearPending: () => clearPendingFlatCollection(PENDING_SUPPORT_CARD_SYNC_KEY)
+  });
+}
+
+async function saveAllSupportCards(items, options = {}) {
+  return saveRemoteBackedFlatCollection(items, {
+    ...options,
+    label: "Support cards",
+    table: window.APP_CONFIG?.SUPPORT_CARDS_TABLE_NAME || "support_cards",
+    remoteLoader: loadSupportCardsFromRemote,
+    loadLocal: loadLocalSupportCards,
+    storeCurrent: storeCurrentSupportCards,
+    markPending: itemsToStore => markPendingFlatCollection(PENDING_SUPPORT_CARD_SYNC_KEY, itemsToStore),
+    clearPending: () => clearPendingFlatCollection(PENDING_SUPPORT_CARD_SYNC_KEY),
+    normalizer: normalizeSupportCard
+  });
+}
+
+async function upsertSupportCard(card) {
+  const cards = await loadSupportCards();
+  const clean = normalizeSupportCard(card);
+  const index = cards.findIndex(entry => entry.id === clean.id);
+
+  if (index >= 0) cards[index] = clean;
+  else cards.unshift(clean);
+
+  await saveAllSupportCards(cards);
+  return clean;
+}
+
+async function deleteSupportCard(id) {
+  const cards = await loadSupportCards();
+  const keptCards = cards.filter(entry => entry.id !== id);
+  await saveAllSupportCards(keptCards, { allowEmpty: true });
+
+  const goals = await loadGoals();
+  const updatedGoals = goals.map(goal => ({
+    ...goal,
+    linked_support_card_ids: (goal.linked_support_card_ids || []).filter(cardId => cardId !== id),
+    updated_at: new Date().toISOString()
+  }));
+  await saveAllGoals(updatedGoals, { allowEmpty: true });
+
+  const reminders = await loadAppReminders();
+  const updatedReminders = reminders.map(reminder =>
+    reminder.linked_support_card_id === id
+      ? { ...reminder, linked_support_card_id: null, updated_at: new Date().toISOString() }
+      : reminder
+  );
+  await saveAllAppReminders(updatedReminders, { allowEmpty: true });
+
+  return keptCards;
+}
+
+async function loadGoals() {
+  return loadRemoteBackedFlatCollection({
+    label: "Goals",
+    table: window.APP_CONFIG?.GOALS_TABLE_NAME || "goals",
+    remoteLoader: loadGoalsFromRemote,
+    loadLocal: loadLocalGoals,
+    loadPending: () => loadPendingFlatCollection(PENDING_GOAL_SYNC_KEY, normalizeGoal),
+    hasPending: () => hasPendingFlatCollection(PENDING_GOAL_SYNC_KEY),
+    storeCurrent: storeCurrentGoals,
+    clearPending: () => clearPendingFlatCollection(PENDING_GOAL_SYNC_KEY)
+  });
+}
+
+async function saveAllGoals(items, options = {}) {
+  return saveRemoteBackedFlatCollection(items, {
+    ...options,
+    label: "Goals",
+    table: window.APP_CONFIG?.GOALS_TABLE_NAME || "goals",
+    remoteLoader: loadGoalsFromRemote,
+    loadLocal: loadLocalGoals,
+    storeCurrent: storeCurrentGoals,
+    markPending: itemsToStore => markPendingFlatCollection(PENDING_GOAL_SYNC_KEY, itemsToStore),
+    clearPending: () => clearPendingFlatCollection(PENDING_GOAL_SYNC_KEY),
+    normalizer: normalizeGoal
+  });
+}
+
+async function upsertGoal(goal) {
+  const goals = await loadGoals();
+  const clean = normalizeGoal(goal);
+  const index = goals.findIndex(entry => entry.id === clean.id);
+
+  if (index >= 0) goals[index] = clean;
+  else goals.unshift(clean);
+
+  await saveAllGoals(goals);
+  return clean;
+}
+
+async function deleteGoal(id) {
+  const goals = await loadGoals();
+  const keptGoals = goals
+    .filter(entry => entry.id !== id)
+    .map(goal => (
+      goal.parent_goal_id === id
+        ? { ...goal, parent_goal_id: null, updated_at: new Date().toISOString() }
+        : goal
+    ));
+  await saveAllGoals(keptGoals, { allowEmpty: true });
+
+  const reminders = await loadAppReminders();
+  const updatedReminders = reminders.map(reminder =>
+    reminder.linked_goal_id === id
+      ? { ...reminder, linked_goal_id: null, updated_at: new Date().toISOString() }
+      : reminder
+  );
+  await saveAllAppReminders(updatedReminders, { allowEmpty: true });
+
+  const tournamentNotes = await loadTournamentNotes();
+  const updatedTournamentNotes = tournamentNotes.map(note =>
+    note.linked_goal_id === id
+      ? { ...note, linked_goal_id: null, updated_at: new Date().toISOString() }
+      : note
+  );
+  await saveAllTournamentNotes(updatedTournamentNotes, { allowEmpty: true });
+
+  return keptGoals;
+}
+
+async function loadAppReminders() {
+  return loadRemoteBackedFlatCollection({
+    label: "App reminders",
+    table: window.APP_CONFIG?.APP_REMINDERS_TABLE_NAME || "app_reminders",
+    remoteLoader: loadAppRemindersFromRemote,
+    loadLocal: loadLocalAppReminders,
+    loadPending: () => loadPendingFlatCollection(PENDING_APP_REMINDER_SYNC_KEY, normalizeAppReminder),
+    hasPending: () => hasPendingFlatCollection(PENDING_APP_REMINDER_SYNC_KEY),
+    storeCurrent: storeCurrentAppReminders,
+    clearPending: () => clearPendingFlatCollection(PENDING_APP_REMINDER_SYNC_KEY)
+  });
+}
+
+async function saveAllAppReminders(items, options = {}) {
+  return saveRemoteBackedFlatCollection(items, {
+    ...options,
+    label: "App reminders",
+    table: window.APP_CONFIG?.APP_REMINDERS_TABLE_NAME || "app_reminders",
+    remoteLoader: loadAppRemindersFromRemote,
+    loadLocal: loadLocalAppReminders,
+    storeCurrent: storeCurrentAppReminders,
+    markPending: itemsToStore => markPendingFlatCollection(PENDING_APP_REMINDER_SYNC_KEY, itemsToStore),
+    clearPending: () => clearPendingFlatCollection(PENDING_APP_REMINDER_SYNC_KEY),
+    normalizer: normalizeAppReminder
+  });
+}
+
+async function upsertAppReminder(reminder) {
+  const reminders = await loadAppReminders();
+  const clean = normalizeAppReminder(reminder);
+  const index = reminders.findIndex(entry => entry.id === clean.id);
+
+  if (index >= 0) reminders[index] = clean;
+  else reminders.unshift(clean);
+
+  await saveAllAppReminders(reminders);
+  return clean;
+}
+
+async function deleteAppReminder(id) {
+  const reminders = await loadAppReminders();
+  const kept = reminders.filter(entry => entry.id !== id);
+  await saveAllAppReminders(kept, { allowEmpty: true });
+  return kept;
+}
+
+async function loadBooks() {
+  return loadRemoteBackedFlatCollection({
+    label: "Books",
+    table: window.APP_CONFIG?.BOOKS_TABLE_NAME || "books",
+    remoteLoader: loadBooksFromRemote,
+    loadLocal: loadLocalBooks,
+    loadPending: () => loadPendingFlatCollection(PENDING_BOOK_SYNC_KEY, normalizeBook),
+    hasPending: () => hasPendingFlatCollection(PENDING_BOOK_SYNC_KEY),
+    storeCurrent: storeCurrentBooks,
+    clearPending: () => clearPendingFlatCollection(PENDING_BOOK_SYNC_KEY)
+  });
+}
+
+async function saveAllBooks(items, options = {}) {
+  return saveRemoteBackedFlatCollection(items, {
+    ...options,
+    label: "Books",
+    table: window.APP_CONFIG?.BOOKS_TABLE_NAME || "books",
+    remoteLoader: loadBooksFromRemote,
+    loadLocal: loadLocalBooks,
+    storeCurrent: storeCurrentBooks,
+    markPending: itemsToStore => markPendingFlatCollection(PENDING_BOOK_SYNC_KEY, itemsToStore),
+    clearPending: () => clearPendingFlatCollection(PENDING_BOOK_SYNC_KEY),
+    normalizer: normalizeBook
+  });
+}
+
+async function upsertBook(book) {
+  const books = await loadBooks();
+  const clean = normalizeBook(book);
+  const index = books.findIndex(entry => entry.id === clean.id);
+
+  if (index >= 0) books[index] = clean;
+  else books.unshift(clean);
+
+  await saveAllBooks(books);
+  return clean;
+}
+
+async function deleteBook(id) {
+  const books = await loadBooks();
+  const keptBooks = books.filter(entry => entry.id !== id);
+  await saveAllBooks(keptBooks, { allowEmpty: true });
+
+  const goals = await loadGoals();
+  const updatedGoals = goals.map(goal =>
+    goal.linked_book_id === id
+      ? { ...goal, linked_book_id: null, updated_at: new Date().toISOString() }
+      : goal
+  );
+  await saveAllGoals(updatedGoals, { allowEmpty: true });
+
+  const reminders = await loadAppReminders();
+  const updatedReminders = reminders.map(reminder =>
+    reminder.linked_book_id === id
+      ? { ...reminder, linked_book_id: null, updated_at: new Date().toISOString() }
+      : reminder
+  );
+  await saveAllAppReminders(updatedReminders, { allowEmpty: true });
+
+  const notes = await loadBookNotes();
+  const keptNotes = notes.filter(note => note.book_id !== id);
+  await saveAllBookNotes(keptNotes, { allowEmpty: true });
+
+  return keptBooks;
+}
+
+async function loadBookNotes() {
+  return loadRemoteBackedFlatCollection({
+    label: "Book notes",
+    table: window.APP_CONFIG?.BOOK_NOTES_TABLE_NAME || "book_notes",
+    remoteLoader: loadBookNotesFromRemote,
+    loadLocal: loadLocalBookNotes,
+    loadPending: () => loadPendingFlatCollection(PENDING_BOOK_NOTE_SYNC_KEY, normalizeBookNote),
+    hasPending: () => hasPendingFlatCollection(PENDING_BOOK_NOTE_SYNC_KEY),
+    storeCurrent: storeCurrentBookNotes,
+    clearPending: () => clearPendingFlatCollection(PENDING_BOOK_NOTE_SYNC_KEY)
+  });
+}
+
+async function saveAllBookNotes(items, options = {}) {
+  return saveRemoteBackedFlatCollection(items, {
+    ...options,
+    label: "Book notes",
+    table: window.APP_CONFIG?.BOOK_NOTES_TABLE_NAME || "book_notes",
+    remoteLoader: loadBookNotesFromRemote,
+    loadLocal: loadLocalBookNotes,
+    storeCurrent: storeCurrentBookNotes,
+    markPending: itemsToStore => markPendingFlatCollection(PENDING_BOOK_NOTE_SYNC_KEY, itemsToStore),
+    clearPending: () => clearPendingFlatCollection(PENDING_BOOK_NOTE_SYNC_KEY),
+    normalizer: normalizeBookNote
+  });
+}
+
+async function upsertBookNote(note) {
+  const notes = await loadBookNotes();
+  const clean = normalizeBookNote(note);
+  const index = notes.findIndex(entry => entry.id === clean.id);
+
+  if (index >= 0) notes[index] = clean;
+  else notes.unshift(clean);
+
+  await saveAllBookNotes(notes);
+  return clean;
+}
+
+async function deleteBookNote(id) {
+  const notes = await loadBookNotes();
+  const kept = notes.filter(entry => entry.id !== id);
+  await saveAllBookNotes(kept, { allowEmpty: true });
+  return kept;
+}
+
+async function loadTournamentNotes() {
+  return loadRemoteBackedFlatCollection({
+    label: "Tournament notes",
+    table: window.APP_CONFIG?.TOURNAMENT_NOTES_TABLE_NAME || "tournament_notes",
+    remoteLoader: loadTournamentNotesFromRemote,
+    loadLocal: loadLocalTournamentNotes,
+    loadPending: () => loadPendingFlatCollection(PENDING_TOURNAMENT_NOTE_SYNC_KEY, normalizeTournamentNote),
+    hasPending: () => hasPendingFlatCollection(PENDING_TOURNAMENT_NOTE_SYNC_KEY),
+    storeCurrent: storeCurrentTournamentNotes,
+    clearPending: () => clearPendingFlatCollection(PENDING_TOURNAMENT_NOTE_SYNC_KEY)
+  });
+}
+
+async function saveAllTournamentNotes(items, options = {}) {
+  return saveRemoteBackedFlatCollection(items, {
+    ...options,
+    label: "Tournament notes",
+    table: window.APP_CONFIG?.TOURNAMENT_NOTES_TABLE_NAME || "tournament_notes",
+    remoteLoader: loadTournamentNotesFromRemote,
+    loadLocal: loadLocalTournamentNotes,
+    storeCurrent: storeCurrentTournamentNotes,
+    markPending: itemsToStore => markPendingFlatCollection(PENDING_TOURNAMENT_NOTE_SYNC_KEY, itemsToStore),
+    clearPending: () => clearPendingFlatCollection(PENDING_TOURNAMENT_NOTE_SYNC_KEY),
+    normalizer: normalizeTournamentNote
+  });
+}
+
+async function upsertTournamentNote(note) {
+  const notes = await loadTournamentNotes();
+  const clean = normalizeTournamentNote(note);
+  const index = notes.findIndex(entry => entry.id === clean.id);
+
+  if (index >= 0) notes[index] = clean;
+  else notes.unshift(clean);
+
+  await saveAllTournamentNotes(notes);
+  return clean;
+}
+
+async function deleteTournamentNote(id) {
+  const notes = await loadTournamentNotes();
+  const kept = notes.filter(entry => entry.id !== id);
+  await saveAllTournamentNotes(kept, { allowEmpty: true });
+  return kept;
+}
+
+async function loadQuickIdeas() {
+  return loadRemoteBackedFlatCollection({
+    label: "Quick ideas",
+    table: window.APP_CONFIG?.QUICK_IDEAS_TABLE_NAME || "quick_ideas",
+    remoteLoader: loadQuickIdeasFromRemote,
+    loadLocal: loadLocalQuickIdeas,
+    loadPending: () => loadPendingFlatCollection(PENDING_QUICK_IDEA_SYNC_KEY, normalizeQuickIdea),
+    hasPending: () => hasPendingFlatCollection(PENDING_QUICK_IDEA_SYNC_KEY),
+    storeCurrent: storeCurrentQuickIdeas,
+    clearPending: () => clearPendingFlatCollection(PENDING_QUICK_IDEA_SYNC_KEY)
+  });
+}
+
+async function saveAllQuickIdeas(items, options = {}) {
+  return saveRemoteBackedFlatCollection(items, {
+    ...options,
+    label: "Quick ideas",
+    table: window.APP_CONFIG?.QUICK_IDEAS_TABLE_NAME || "quick_ideas",
+    remoteLoader: loadQuickIdeasFromRemote,
+    loadLocal: loadLocalQuickIdeas,
+    storeCurrent: storeCurrentQuickIdeas,
+    markPending: itemsToStore => markPendingFlatCollection(PENDING_QUICK_IDEA_SYNC_KEY, itemsToStore),
+    clearPending: () => clearPendingFlatCollection(PENDING_QUICK_IDEA_SYNC_KEY),
+    normalizer: normalizeQuickIdea
+  });
+}
+
+async function upsertQuickIdea(idea) {
+  const ideas = await loadQuickIdeas();
+  const clean = normalizeQuickIdea(idea);
+  const index = ideas.findIndex(entry => entry.id === clean.id);
+
+  if (index >= 0) ideas[index] = clean;
+  else ideas.unshift(clean);
+
+  await saveAllQuickIdeas(ideas);
+  return clean;
+}
+
+async function deleteQuickIdea(id) {
+  const ideas = await loadQuickIdeas();
+  const kept = ideas.filter(entry => entry.id !== id);
+  await saveAllQuickIdeas(kept, { allowEmpty: true });
+  return kept;
+}
+
 window.OpeningDB = {
   loadNodes,
   saveAllNodes,
@@ -1577,5 +2375,40 @@ window.OpeningDB = {
   saveAllMistakes,
   upsertMistake,
   deleteMistake,
-  normalizeMistake
+  normalizeMistake,
+  loadSupportCards,
+  saveAllSupportCards,
+  upsertSupportCard,
+  deleteSupportCard,
+  normalizeSupportCard,
+  loadGoals,
+  saveAllGoals,
+  upsertGoal,
+  deleteGoal,
+  normalizeGoal,
+  loadAppReminders,
+  saveAllAppReminders,
+  upsertAppReminder,
+  deleteAppReminder,
+  normalizeAppReminder,
+  loadBooks,
+  saveAllBooks,
+  upsertBook,
+  deleteBook,
+  normalizeBook,
+  loadBookNotes,
+  saveAllBookNotes,
+  upsertBookNote,
+  deleteBookNote,
+  normalizeBookNote,
+  loadTournamentNotes,
+  saveAllTournamentNotes,
+  upsertTournamentNote,
+  deleteTournamentNote,
+  normalizeTournamentNote,
+  loadQuickIdeas,
+  saveAllQuickIdeas,
+  upsertQuickIdea,
+  deleteQuickIdea,
+  normalizeQuickIdea
 };

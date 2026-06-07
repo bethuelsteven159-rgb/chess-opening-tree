@@ -12,7 +12,7 @@
   <script>
     document.documentElement.dataset.theme = localStorage.getItem("gm_opening_tree_theme_v1") || "dark";
   </script>
-  <link rel="stylesheet" href="styles.css?v=15" />
+  <link rel="stylesheet" href="styles.css" />
   <script src="vendor/supabase-js.min.js"></script>
   <script src="vendor/chess.min.js"></script>
 </head>
@@ -38,6 +38,7 @@
         <a class="nav-link" href="positions.html">Positions</a>
         <a class="nav-link" href="training.html">Training</a>
         <a class="nav-link" href="repair.html">Repair</a>
+        <a class="nav-link" href="support.html">Support</a>
       </div>
 
       <div class="nav-actions">
@@ -151,6 +152,16 @@
             <span>Linked to board positions</span>
           </div>
         </a>
+
+        <a class="study-choice-card" href="support.html">
+          <span class="study-choice-kicker">Support hub</span>
+          <h4>Hold goals, reminders, books, and mindset cards</h4>
+          <p>Keep the non-board parts of the journey visible without polluting the chess analysis pages.</p>
+          <div class="study-choice-meta">
+            <strong id="dashboardSupportCount">0 goals • 0 due</strong>
+            <span>Goals, reminders, books, cards</span>
+          </div>
+        </a>
       </div>
     </section>
 
@@ -165,17 +176,20 @@
       </article>
 
       <article class="panel dashboard-roadmap-panel">
-        <p class="eyebrow">Expansion lane</p>
-        <h3>Built for the full GM brain</h3>
+        <p class="eyebrow">Support brain</p>
+        <h3>Visible outside-the-board work</h3>
         <p class="muted">
-          Openings are now only one module. The same shell is ready for model games, middlegame plans, endgame studies, and future review evidence without turning the app into one giant crowded page.
+          Overdue reminders, current books, pinned cards, and critical goals stay visible here while the actual editing lives in the Support Hub.
         </p>
-        <div class="roadmap-pill-row">
-          <span class="roadmap-pill">Openings live</span>
-          <span class="roadmap-pill">Game analysis live</span>
-          <span class="roadmap-pill">Positions live</span>
-          <span class="roadmap-pill">Middlegames next</span>
-          <span class="roadmap-pill">Endgames after</span>
+        <div class="intro-stat-stack">
+          <span id="dashboardDueReminderCount" class="status-pill">0 due reminders</span>
+          <span id="dashboardCurrentBooksCount" class="status-pill">0 current books</span>
+          <span id="dashboardActiveGoalsCount" class="status-pill">0 active goals</span>
+          <span id="dashboardPinnedCardsCount" class="status-pill">0 pinned cards</span>
+          <span id="dashboardSupportCriticalGoals" class="status-pill">0 critical goals</span>
+        </div>
+        <div id="dashboardSupportSummary" class="heatmap-list">
+          <div class="line-empty">No support items yet. Add goals, reminders, books, or cards in the Support Hub.</div>
         </div>
       </article>
     </section>
@@ -207,7 +221,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
-  <script type="module" src="./js/app.js?v=15"></script>
+  <script type="module" src="./js/app.js"></script>
   <script>
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
   </script>

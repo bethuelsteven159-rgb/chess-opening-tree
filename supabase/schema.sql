@@ -270,6 +270,271 @@ alter table game_annotations add column if not exists repair_id uuid references 
 alter table game_annotations add column if not exists created_at timestamptz default now();
 alter table game_annotations add column if not exists updated_at timestamptz default now();
 
+create table if not exists support_cards (
+  id uuid primary key default gen_random_uuid(),
+  title text default '',
+  body text default '',
+  card_type text not null default 'note'
+    check (card_type in ('identity', 'principle', 'quote', 'anti_tilt', 'advice', 'checklist', 'mindset', 'study_rule', 'tournament', 'note')),
+  category text not null default 'other'
+    check (category in ('vision', 'discipline', 'emotional_control', 'study_process', 'tournament_strength', 'confidence', 'recovery', 'other')),
+  pinned boolean default false,
+  priority text not null default 'normal' check (priority in ('low', 'normal', 'high', 'critical')),
+  tags text[] default '{}',
+  source text default '',
+  source_url text default '',
+  status text not null default 'active' check (status in ('active', 'archived')),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  last_reviewed_at timestamptz,
+  review_count integer default 0
+);
+
+alter table support_cards add column if not exists title text default '';
+alter table support_cards add column if not exists body text default '';
+alter table support_cards add column if not exists card_type text not null default 'note';
+alter table support_cards add column if not exists category text not null default 'other';
+alter table support_cards add column if not exists pinned boolean default false;
+alter table support_cards add column if not exists priority text not null default 'normal';
+alter table support_cards add column if not exists tags text[] default '{}';
+alter table support_cards add column if not exists source text default '';
+alter table support_cards add column if not exists source_url text default '';
+alter table support_cards add column if not exists status text not null default 'active';
+alter table support_cards add column if not exists created_at timestamptz default now();
+alter table support_cards add column if not exists updated_at timestamptz default now();
+alter table support_cards add column if not exists last_reviewed_at timestamptz;
+alter table support_cards add column if not exists review_count integer default 0;
+
+create table if not exists books (
+  id uuid primary key default gen_random_uuid(),
+  title text default '',
+  author text default '',
+  format text not null default 'book'
+    check (format in ('book', 'pdf', 'course', 'video_series', 'article', 'website', 'other')),
+  status text not null default 'want_to_read'
+    check (status in ('want_to_read', 'currently_reading', 'paused', 'finished', 'dropped', 'reference')),
+  area text not null default 'general'
+    check (area in ('opening', 'middlegame', 'endgame', 'tactics', 'calculation', 'strategy', 'game_collection', 'psychology', 'tournament_play', 'biography', 'general', 'other')),
+  reason text default '',
+  what_it_teaches text default '',
+  current_page integer,
+  total_pages integer,
+  progress_percent numeric,
+  started_at text default '',
+  target_finish_date text default '',
+  finished_at text default '',
+  rating integer,
+  key_lessons text default '',
+  action_items text default '',
+  source_url text default '',
+  file_label text default '',
+  tags text[] default '{}',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table books add column if not exists title text default '';
+alter table books add column if not exists author text default '';
+alter table books add column if not exists format text not null default 'book';
+alter table books add column if not exists status text not null default 'want_to_read';
+alter table books add column if not exists area text not null default 'general';
+alter table books add column if not exists reason text default '';
+alter table books add column if not exists what_it_teaches text default '';
+alter table books add column if not exists current_page integer;
+alter table books add column if not exists total_pages integer;
+alter table books add column if not exists progress_percent numeric;
+alter table books add column if not exists started_at text default '';
+alter table books add column if not exists target_finish_date text default '';
+alter table books add column if not exists finished_at text default '';
+alter table books add column if not exists rating integer;
+alter table books add column if not exists key_lessons text default '';
+alter table books add column if not exists action_items text default '';
+alter table books add column if not exists source_url text default '';
+alter table books add column if not exists file_label text default '';
+alter table books add column if not exists tags text[] default '{}';
+alter table books add column if not exists created_at timestamptz default now();
+alter table books add column if not exists updated_at timestamptz default now();
+
+create table if not exists goals (
+  id uuid primary key default gen_random_uuid(),
+  title text default '',
+  goal_type text not null default 'custom'
+    check (goal_type in ('ultimate', 'annual', 'quarterly', 'monthly', 'rating', 'tournament', 'book', 'process', 'mindset', 'custom')),
+  description text default '',
+  why text default '',
+  success_criteria text default '',
+  current_value numeric,
+  target_value numeric,
+  unit text default '',
+  manual_progress_percent numeric,
+  target_date text default '',
+  status text not null default 'active' check (status in ('not_started', 'active', 'paused', 'achieved', 'abandoned')),
+  priority text not null default 'normal' check (priority in ('low', 'normal', 'high', 'critical')),
+  parent_goal_id uuid references goals(id) on delete set null,
+  linked_book_id uuid references books(id) on delete set null,
+  linked_support_card_ids text[] default '{}',
+  tags text[] default '{}',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  completed_at timestamptz,
+  last_touched_at timestamptz
+);
+
+alter table goals add column if not exists title text default '';
+alter table goals add column if not exists goal_type text not null default 'custom';
+alter table goals add column if not exists description text default '';
+alter table goals add column if not exists why text default '';
+alter table goals add column if not exists success_criteria text default '';
+alter table goals add column if not exists current_value numeric;
+alter table goals add column if not exists target_value numeric;
+alter table goals add column if not exists unit text default '';
+alter table goals add column if not exists manual_progress_percent numeric;
+alter table goals add column if not exists target_date text default '';
+alter table goals add column if not exists status text not null default 'active';
+alter table goals add column if not exists priority text not null default 'normal';
+alter table goals add column if not exists parent_goal_id uuid references goals(id) on delete set null;
+alter table goals add column if not exists linked_book_id uuid references books(id) on delete set null;
+alter table goals add column if not exists linked_support_card_ids text[] default '{}';
+alter table goals add column if not exists tags text[] default '{}';
+alter table goals add column if not exists created_at timestamptz default now();
+alter table goals add column if not exists updated_at timestamptz default now();
+alter table goals add column if not exists completed_at timestamptz;
+alter table goals add column if not exists last_touched_at timestamptz;
+
+create table if not exists app_reminders (
+  id uuid primary key default gen_random_uuid(),
+  title text default '',
+  note text default '',
+  reminder_type text not null default 'custom'
+    check (reminder_type in ('goal', 'book', 'tournament', 'admin', 'mindset', 'review', 'custom')),
+  due_date text default '',
+  due_time text default '',
+  repeat_rule text not null default 'none' check (repeat_rule in ('none', 'daily', 'weekly', 'monthly', 'custom_days')),
+  repeat_interval integer default 1,
+  repeat_days text[] default '{}',
+  status text not null default 'active' check (status in ('active', 'done', 'snoozed', 'archived')),
+  snooze_until text default '',
+  priority text not null default 'normal' check (priority in ('low', 'normal', 'high', 'critical')),
+  linked_goal_id uuid references goals(id) on delete set null,
+  linked_book_id uuid references books(id) on delete set null,
+  linked_support_card_id uuid references support_cards(id) on delete set null,
+  tags text[] default '{}',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  completed_at timestamptz
+);
+
+alter table app_reminders add column if not exists title text default '';
+alter table app_reminders add column if not exists note text default '';
+alter table app_reminders add column if not exists reminder_type text not null default 'custom';
+alter table app_reminders add column if not exists due_date text default '';
+alter table app_reminders add column if not exists due_time text default '';
+alter table app_reminders add column if not exists repeat_rule text not null default 'none';
+alter table app_reminders add column if not exists repeat_interval integer default 1;
+alter table app_reminders add column if not exists repeat_days text[] default '{}';
+alter table app_reminders add column if not exists status text not null default 'active';
+alter table app_reminders add column if not exists snooze_until text default '';
+alter table app_reminders add column if not exists priority text not null default 'normal';
+alter table app_reminders add column if not exists linked_goal_id uuid references goals(id) on delete set null;
+alter table app_reminders add column if not exists linked_book_id uuid references books(id) on delete set null;
+alter table app_reminders add column if not exists linked_support_card_id uuid references support_cards(id) on delete set null;
+alter table app_reminders add column if not exists tags text[] default '{}';
+alter table app_reminders add column if not exists created_at timestamptz default now();
+alter table app_reminders add column if not exists updated_at timestamptz default now();
+alter table app_reminders add column if not exists completed_at timestamptz;
+
+create table if not exists book_notes (
+  id uuid primary key default gen_random_uuid(),
+  book_id uuid references books(id) on delete cascade,
+  title text default '',
+  page text default '',
+  chapter text default '',
+  note text default '',
+  lesson text default '',
+  action_item text default '',
+  tags text[] default '{}',
+  linked_opening_node_id uuid references opening_nodes(id) on delete set null,
+  linked_position_id uuid references positions(id) on delete set null,
+  linked_repair_id uuid references repair_items(id) on delete set null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table book_notes add column if not exists book_id uuid references books(id) on delete cascade;
+alter table book_notes add column if not exists title text default '';
+alter table book_notes add column if not exists page text default '';
+alter table book_notes add column if not exists chapter text default '';
+alter table book_notes add column if not exists note text default '';
+alter table book_notes add column if not exists lesson text default '';
+alter table book_notes add column if not exists action_item text default '';
+alter table book_notes add column if not exists tags text[] default '{}';
+alter table book_notes add column if not exists linked_opening_node_id uuid references opening_nodes(id) on delete set null;
+alter table book_notes add column if not exists linked_position_id uuid references positions(id) on delete set null;
+alter table book_notes add column if not exists linked_repair_id uuid references repair_items(id) on delete set null;
+alter table book_notes add column if not exists created_at timestamptz default now();
+alter table book_notes add column if not exists updated_at timestamptz default now();
+
+create table if not exists tournament_notes (
+  id uuid primary key default gen_random_uuid(),
+  event_name text default '',
+  event_date text default '',
+  event_location text default '',
+  time_control text default '',
+  section text default '',
+  status text not null default 'planned' check (status in ('planned', 'active', 'completed', 'cancelled')),
+  pre_event_goal text default '',
+  opening_focus text default '',
+  mental_focus text default '',
+  practical_checklist text default '',
+  round_notes text default '',
+  after_event_lessons text default '',
+  linked_goal_id uuid references goals(id) on delete set null,
+  tags text[] default '{}',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table tournament_notes add column if not exists event_name text default '';
+alter table tournament_notes add column if not exists event_date text default '';
+alter table tournament_notes add column if not exists event_location text default '';
+alter table tournament_notes add column if not exists time_control text default '';
+alter table tournament_notes add column if not exists section text default '';
+alter table tournament_notes add column if not exists status text not null default 'planned';
+alter table tournament_notes add column if not exists pre_event_goal text default '';
+alter table tournament_notes add column if not exists opening_focus text default '';
+alter table tournament_notes add column if not exists mental_focus text default '';
+alter table tournament_notes add column if not exists practical_checklist text default '';
+alter table tournament_notes add column if not exists round_notes text default '';
+alter table tournament_notes add column if not exists after_event_lessons text default '';
+alter table tournament_notes add column if not exists linked_goal_id uuid references goals(id) on delete set null;
+alter table tournament_notes add column if not exists tags text[] default '{}';
+alter table tournament_notes add column if not exists created_at timestamptz default now();
+alter table tournament_notes add column if not exists updated_at timestamptz default now();
+
+create table if not exists quick_ideas (
+  id uuid primary key default gen_random_uuid(),
+  title text default '',
+  body text default '',
+  idea_type text not null default 'general'
+    check (idea_type in ('general', 'opening', 'training', 'book', 'mindset', 'tournament', 'app_improvement', 'other')),
+  status text not null default 'inbox' check (status in ('inbox', 'converted', 'archived')),
+  converted_to_type text default '',
+  converted_to_id text default '',
+  tags text[] default '{}',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table quick_ideas add column if not exists title text default '';
+alter table quick_ideas add column if not exists body text default '';
+alter table quick_ideas add column if not exists idea_type text not null default 'general';
+alter table quick_ideas add column if not exists status text not null default 'inbox';
+alter table quick_ideas add column if not exists converted_to_type text default '';
+alter table quick_ideas add column if not exists converted_to_id text default '';
+alter table quick_ideas add column if not exists tags text[] default '{}';
+alter table quick_ideas add column if not exists created_at timestamptz default now();
+alter table quick_ideas add column if not exists updated_at timestamptz default now();
+
 create index if not exists opening_nodes_parent_idx on opening_nodes(parent_id);
 create index if not exists repair_items_related_node_idx on repair_items(related_node_id);
 create index if not exists games_opening_idx on games(linked_opening_node_id);
@@ -282,6 +547,14 @@ create index if not exists game_annotations_game_idx on game_annotations(game_id
 create index if not exists game_annotations_position_idx on game_annotations(position_id);
 create index if not exists game_annotations_mistake_idx on game_annotations(mistake_id);
 create index if not exists game_annotations_repair_idx on game_annotations(repair_id);
+create index if not exists support_cards_updated_idx on support_cards(updated_at);
+create index if not exists goals_parent_idx on goals(parent_goal_id);
+create index if not exists goals_book_idx on goals(linked_book_id);
+create index if not exists app_reminders_goal_idx on app_reminders(linked_goal_id);
+create index if not exists app_reminders_book_idx on app_reminders(linked_book_id);
+create index if not exists app_reminders_support_card_idx on app_reminders(linked_support_card_id);
+create index if not exists book_notes_book_idx on book_notes(book_id);
+create index if not exists tournament_notes_goal_idx on tournament_notes(linked_goal_id);
 
 alter table opening_nodes enable row level security;
 alter table repair_items enable row level security;
@@ -289,6 +562,13 @@ alter table games enable row level security;
 alter table positions enable row level security;
 alter table mistakes enable row level security;
 alter table game_annotations enable row level security;
+alter table support_cards enable row level security;
+alter table goals enable row level security;
+alter table app_reminders enable row level security;
+alter table books enable row level security;
+alter table book_notes enable row level security;
+alter table tournament_notes enable row level security;
+alter table quick_ideas enable row level security;
 
 drop policy if exists "Allow public read" on opening_nodes;
 drop policy if exists "Allow public insert" on opening_nodes;
@@ -414,4 +694,151 @@ using (true);
 
 create policy "Allow public delete"
 on game_annotations for delete
+using (true);
+
+drop policy if exists "Allow public read" on support_cards;
+drop policy if exists "Allow public insert" on support_cards;
+drop policy if exists "Allow public update" on support_cards;
+drop policy if exists "Allow public delete" on support_cards;
+
+create policy "Allow public read"
+on support_cards for select
+using (true);
+
+create policy "Allow public insert"
+on support_cards for insert
+with check (true);
+
+create policy "Allow public update"
+on support_cards for update
+using (true);
+
+create policy "Allow public delete"
+on support_cards for delete
+using (true);
+
+drop policy if exists "Allow public read" on books;
+drop policy if exists "Allow public insert" on books;
+drop policy if exists "Allow public update" on books;
+drop policy if exists "Allow public delete" on books;
+
+create policy "Allow public read"
+on books for select
+using (true);
+
+create policy "Allow public insert"
+on books for insert
+with check (true);
+
+create policy "Allow public update"
+on books for update
+using (true);
+
+create policy "Allow public delete"
+on books for delete
+using (true);
+
+drop policy if exists "Allow public read" on goals;
+drop policy if exists "Allow public insert" on goals;
+drop policy if exists "Allow public update" on goals;
+drop policy if exists "Allow public delete" on goals;
+
+create policy "Allow public read"
+on goals for select
+using (true);
+
+create policy "Allow public insert"
+on goals for insert
+with check (true);
+
+create policy "Allow public update"
+on goals for update
+using (true);
+
+create policy "Allow public delete"
+on goals for delete
+using (true);
+
+drop policy if exists "Allow public read" on app_reminders;
+drop policy if exists "Allow public insert" on app_reminders;
+drop policy if exists "Allow public update" on app_reminders;
+drop policy if exists "Allow public delete" on app_reminders;
+
+create policy "Allow public read"
+on app_reminders for select
+using (true);
+
+create policy "Allow public insert"
+on app_reminders for insert
+with check (true);
+
+create policy "Allow public update"
+on app_reminders for update
+using (true);
+
+create policy "Allow public delete"
+on app_reminders for delete
+using (true);
+
+drop policy if exists "Allow public read" on book_notes;
+drop policy if exists "Allow public insert" on book_notes;
+drop policy if exists "Allow public update" on book_notes;
+drop policy if exists "Allow public delete" on book_notes;
+
+create policy "Allow public read"
+on book_notes for select
+using (true);
+
+create policy "Allow public insert"
+on book_notes for insert
+with check (true);
+
+create policy "Allow public update"
+on book_notes for update
+using (true);
+
+create policy "Allow public delete"
+on book_notes for delete
+using (true);
+
+drop policy if exists "Allow public read" on tournament_notes;
+drop policy if exists "Allow public insert" on tournament_notes;
+drop policy if exists "Allow public update" on tournament_notes;
+drop policy if exists "Allow public delete" on tournament_notes;
+
+create policy "Allow public read"
+on tournament_notes for select
+using (true);
+
+create policy "Allow public insert"
+on tournament_notes for insert
+with check (true);
+
+create policy "Allow public update"
+on tournament_notes for update
+using (true);
+
+create policy "Allow public delete"
+on tournament_notes for delete
+using (true);
+
+drop policy if exists "Allow public read" on quick_ideas;
+drop policy if exists "Allow public insert" on quick_ideas;
+drop policy if exists "Allow public update" on quick_ideas;
+drop policy if exists "Allow public delete" on quick_ideas;
+
+create policy "Allow public read"
+on quick_ideas for select
+using (true);
+
+create policy "Allow public insert"
+on quick_ideas for insert
+with check (true);
+
+create policy "Allow public update"
+on quick_ideas for update
+using (true);
+
+create policy "Allow public delete"
+on quick_ideas for delete
 using (true);
