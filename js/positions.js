@@ -108,7 +108,15 @@ function renderPositionList() {
         </div>
       </button>
     `;
-  }).join("") || `<div class="line-empty">No positions stored yet. Extract one from the game analysis page to start the vault.</div>`;
+  }).join("") || `
+    <div class="support-empty-state">
+      <div>
+        <strong>No positions stored yet.</strong>
+        <p>To create one: open <code>Games</code>, choose a move, then press <code>Save position card</code>.</p>
+        <p><a class="button button-primary button-tiny" href="games.html">Go to Games</a></p>
+      </div>
+    </div>
+  `;
 }
 
 function renderBoard() {
@@ -120,7 +128,7 @@ function renderBoard() {
     const view = boardViewFromFen("");
     board.innerHTML = view.html;
     setText("positionBoardTitle", "No position selected");
-    setText("positionBoardSubtitle", "Choose a saved position to inspect the board, source, and linked lesson.");
+    setText("positionBoardSubtitle", "This page reviews saved positions. Capture one from the Games page first, then inspect and refine it here.");
     setText("positionBoardMeta", "Waiting for position");
     setText("positionTypeValue", "Position");
     setText("positionTypeCaption", "The stored position family will appear here.");
@@ -169,10 +177,10 @@ function renderEditor() {
 
   setText("positionEditorState", position
     ? `Editing ${position.title || "selected position"}.`
-    : "Select a vault entry to edit the human question, move idea, and lesson.");
+    : "Select a saved vault entry to edit the human question, move idea, and lesson. New positions are created from the Games page.");
   setText("positionLinkBanner", position
     ? `${position.source_type || "position"} source • ${position.side_to_move === "b" ? "Black to move" : "White to move"}`
-    : "No position selected yet.");
+    : "No position selected yet. Capture a position from Games, then it will appear here.");
 
   if ($("positionTitleInput")) $("positionTitleInput").value = position?.title || "";
   if ($("positionQuestionInput")) $("positionQuestionInput").value = position?.short_question || "";

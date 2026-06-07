@@ -1678,6 +1678,31 @@ select:focus {
   padding-bottom: 20px;
 }
 
+.position-guide-panel,
+.position-list-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.position-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.position-guide-note {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(95, 192, 172, 0.08);
+}
+
+.position-guide-note strong {
+  font-family: var(--font-heading);
+}
+
 .game-import-panel,
 .game-replay-panel,
 .annotation-panel,
@@ -1738,9 +1763,11 @@ select:focus {
 
 .game-list-panel {
   grid-area: list;
+  display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 260px;
   max-height: 340px;
+  overflow: hidden;
 }
 
 .game-import-panel {
@@ -1796,7 +1823,9 @@ select:focus {
 
 .game-list {
   min-height: 0;
-  overflow: auto;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 6px;
 }
 
@@ -2165,6 +2194,7 @@ select:focus {
   .game-meta-grid,
   .game-import-grid,
   .position-filter-grid,
+  .position-guide-grid,
   .support-card-grid,
   .support-quick-form,
   .support-form-grid {
