@@ -52,9 +52,9 @@
       <div class="section-heading">
         <div>
           <p class="eyebrow">Repair loop</p>
-          <h2>Capture the mistake, name the lesson, and repair it until it stops hurting.</h2>
+          <h2>Capture the mistake, test the memory, and reopen it if the leak comes back.</h2>
           <p class="muted">
-            This page stays tied to a board position, so every lesson lives in the exact place where the game went wrong.
+            Repairs are no longer just notes. They can carry a board, a test question, a response, a status, and a review schedule.
           </p>
         </div>
 
@@ -122,15 +122,19 @@
         <div class="section-heading">
           <div>
             <h3>Lesson editor</h3>
-            <p id="repairEditorState" class="muted">Capture the mistake, the lesson, and the repair plan.</p>
+            <p id="repairEditorState" class="muted">Capture the mistake, the lesson, the test question, and the repair action.</p>
           </div>
 
           <label class="filter-field">
             <span>Filter</span>
             <select id="repairFilterInput">
               <option value="all">All repairs</option>
-              <option value="needs_work">Needs work</option>
+              <option value="captured">Captured</option>
+              <option value="understood">Understood</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="testing">Testing</option>
               <option value="solved">Solved</option>
+              <option value="reopened">Reopened</option>
             </select>
           </label>
         </div>
@@ -139,6 +143,9 @@
           <input id="repairIdInput" type="hidden" />
           <input id="repairNodeIdInput" type="hidden" />
           <input id="repairPathInput" type="hidden" />
+          <input id="repairLinkedPositionIdInput" type="hidden" />
+          <input id="repairLinkedGameIdInput" type="hidden" />
+          <input id="repairLinkedAnnotationIdInput" type="hidden" />
 
           <div id="repairLinkMeta" class="repair-link-banner">Not linked to a move yet.</div>
 
@@ -153,21 +160,73 @@
           </label>
 
           <label>
-            Repair
+            Repair action
             <textarea id="repairActionInput" rows="3" placeholder="Review three model games and drill the move order tonight." required></textarea>
           </label>
 
           <label>
-            Status
-            <select id="repairStatusInput">
-              <option value="needs_work">Needs work</option>
-              <option value="solved">Solved</option>
-            </select>
+            Test question
+            <textarea id="repairQuestionInput" rows="3" placeholder="What should I do before pushing d4 here?"></textarea>
+          </label>
+
+          <label>
+            Correct response
+            <textarea id="repairResponseInput" rows="3" placeholder="Play c3 first, then build d4 only when the center stays stable."></textarea>
+          </label>
+
+          <div class="position-editor-grid">
+            <label>
+              Status
+              <select id="repairStatusInput">
+                <option value="captured">Captured</option>
+                <option value="understood">Understood</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="testing">Testing</option>
+                <option value="solved">Solved</option>
+                <option value="reopened">Reopened</option>
+              </select>
+            </label>
+
+            <label>
+              Severity
+              <select id="repairSeverityInput">
+                <option value="normal">Normal</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+                <option value="low">Low</option>
+              </select>
+            </label>
+
+            <label>
+              Category
+              <select id="repairCategoryInput">
+                <option value="other">Other</option>
+                <option value="opening">Opening</option>
+                <option value="middlegame">Middlegame</option>
+                <option value="endgame">Endgame</option>
+                <option value="tactic">Tactic</option>
+                <option value="defense">Defense</option>
+                <option value="conversion">Conversion</option>
+                <option value="strategy">Strategy</option>
+                <option value="calculation">Calculation</option>
+                <option value="psychology">Psychology</option>
+                <option value="time_management">Time management</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="check-row">
+            <input id="repairReviewEnabledInput" type="checkbox" checked />
+            <span>
+              Include in review queue
+              <small>This repair will appear in Training > Repairs and Mixed Due Review.</small>
+            </span>
           </label>
 
           <div class="form-actions">
             <button class="button button-primary" type="submit">Save repair</button>
             <button id="repairResetBtn" class="button button-ghost" type="button">New blank repair</button>
+            <a class="button button-secondary" href="training.html">Open repair training</a>
           </div>
         </form>
       </section>
@@ -182,6 +241,13 @@
         </div>
 
         <div id="repairList" class="repair-list"></div>
+
+        <div class="line-block">
+          <div class="line-label">Attempt history</div>
+          <div id="repairAttemptList" class="line-strip">
+            <div class="line-empty">Review attempts will appear here after you use Training > Repairs.</div>
+          </div>
+        </div>
       </section>
     </section>
   </main>
@@ -192,7 +258,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
-  <script type="module" src="./js/app.js"></script>
+  <script type="module" src="./js/repair.js"></script>
   <script>
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
   </script>

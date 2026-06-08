@@ -52,15 +52,14 @@
       <div class="section-heading">
         <div>
           <p class="eyebrow">Training mode</p>
-          <h2>Choose the root, hear the reply, then answer from the board.</h2>
+          <h2>Review openings, positions, and repairs from one calm board-first lane.</h2>
           <p class="muted">
-            Pick the color you want to train, lock onto one opening or study root, and keep drilling the branch until the stored line runs out.
-            Preferred moves count as correct when the position branches, and moves marked do not train stay out of the queue.
+            The final trainer now handles complete opening leaf lines, manual or game-derived positions, repair cards, and one mixed due queue that tells you what the chess brain wants next.
           </p>
         </div>
 
         <div class="page-intro-meta">
-          <span id="trainerQueueCount" class="status-pill">0 roots ready</span>
+          <span id="trainerQueueCount" class="status-pill">0 items ready</span>
         </div>
       </div>
     </section>
@@ -70,105 +69,156 @@
     <section class="panel trainer-setup-panel">
       <div class="section-heading">
         <div>
-          <h3>Session setup</h3>
-          <p id="trainerSelectionStatus" class="muted">Choose a color and a study root, then start the next line.</p>
+          <h3>Review setup</h3>
+          <p id="trainerSelectionStatus" class="muted">Pick the review lane you want, then start the next due item.</p>
         </div>
 
         <div class="stack-actions">
-          <button id="startTrainingBtn" class="button button-primary button-tiny" type="button">Start line</button>
+          <button id="startTrainingBtn" class="button button-primary button-tiny" type="button">Start review</button>
+          <button id="clearTrainingBtn" class="button button-secondary button-tiny" type="button">Reset session</button>
           <a class="button button-ghost button-tiny" href="editor.html">Open move editor</a>
         </div>
       </div>
 
+      <div id="trainerModeTabs" class="support-workspace-tabs" aria-label="Training modes">
+        <button class="support-workspace-tab is-active" type="button" data-training-mode="opening_lines">
+          <strong>Opening Lines</strong>
+          <span>Complete leaf lines</span>
+        </button>
+        <button class="support-workspace-tab" type="button" data-training-mode="positions">
+          <strong>Positions</strong>
+          <span>Vault review cards</span>
+        </button>
+        <button class="support-workspace-tab" type="button" data-training-mode="repairs">
+          <strong>Repairs</strong>
+          <span>Weakness repair loop</span>
+        </button>
+        <button class="support-workspace-tab" type="button" data-training-mode="mixed">
+          <strong>Mixed Due</strong>
+          <span>Everything due now</span>
+        </button>
+      </div>
+
       <div class="trainer-setup-grid">
         <article class="trainer-filter-card">
-          <span class="line-label">Train with</span>
+          <span class="line-label">Opening color</span>
           <div class="segmented-control">
             <button id="trainerColorWhiteBtn" class="button button-secondary button-tiny segmented-button" type="button">White</button>
             <button id="trainerColorBlackBtn" class="button button-secondary button-tiny segmented-button" type="button">Black</button>
+            <button id="trainerColorAllBtn" class="button button-secondary button-tiny segmented-button" type="button">All</button>
           </div>
         </article>
 
         <label class="trainer-select-field">
-          Study root
+          Root filter
           <select id="trainerRootSelect">
-            <option value="">No roots yet</option>
+            <option value="">All roots</option>
+          </select>
+        </label>
+
+        <label class="trainer-select-field">
+          Queue mode
+          <select id="trainerLineModeSelect">
+            <option value="due_only">Due only</option>
+            <option value="all_leaf_lines">All leaf lines</option>
+            <option value="weakest_first">Weakest first</option>
+            <option value="new_first">New / unreviewed first</option>
           </select>
         </label>
 
         <article class="trainer-filter-card">
           <span class="line-label">Current session</span>
-          <strong id="trainerSessionTitle">Choose a study root</strong>
-          <p id="trainerSessionSubtitle" class="muted">Pick the opening or study root you want to drill.</p>
+          <strong id="trainerSessionTitle">Choose a review lane</strong>
+          <p id="trainerSessionSubtitle" class="muted">Pick a queue item on the left or let the trainer choose the next due card.</p>
         </article>
       </div>
     </section>
 
-    <section class="panel trainer-panel">
-      <div class="trainer-layout">
-        <div class="trainer-board-panel">
-          <div id="trainerTurnPill" class="mini-pill">No line active</div>
-          <div id="trainerBoard" class="chess-board compact" role="img" aria-label="Training chess board"></div>
-          <p id="trainerProgressText" class="trainer-hint">0 solved prompts in this session.</p>
+    <section class="trainer-universal-grid">
+      <aside class="panel trainer-queue-panel">
+        <div class="section-heading">
+          <div>
+            <h3>Review queue</h3>
+            <p id="trainerQueueSubtitle" class="muted">Leaf lines, positions, repairs, or mixed due review will appear here.</p>
+          </div>
         </div>
 
-        <div class="trainer-info">
-          <div class="board-detail-grid">
-            <article class="board-detail-card">
-              <span class="board-detail-label">Study root</span>
-              <strong id="trainerOpeningValue">No root selected</strong>
-              <p id="trainerOpeningCaption">Create or keep a root line available for training in the move editor.</p>
-            </article>
+        <div id="trainingQueueList" class="position-list"></div>
+      </aside>
 
-            <article class="board-detail-card">
-              <span class="board-detail-label">Opponent responded</span>
-              <strong id="trainerOpponentMove">Waiting</strong>
-              <p id="trainerOpponentMeta">The trainer will start speaking in positions as soon as you choose a root.</p>
-            </article>
+      <section class="panel trainer-panel">
+        <div class="trainer-layout">
+          <div class="trainer-board-panel">
+            <div id="trainerTurnPill" class="mini-pill">No review active</div>
+            <div id="trainerBoard" class="chess-board compact" role="img" aria-label="Training chess board"></div>
+            <p id="trainerProgressText" class="trainer-hint">0 reviews completed in this session.</p>
           </div>
 
-          <div class="line-block">
-            <div class="line-label">Position</div>
-            <h4 id="trainerPositionTitle">Trainer waiting</h4>
-            <div id="trainerPositionLine" class="line-strip"></div>
-          </div>
+          <div class="trainer-info">
+            <div class="board-detail-grid">
+              <article class="board-detail-card">
+                <span class="board-detail-label">Review source</span>
+                <strong id="trainerOpeningValue">Nothing selected</strong>
+                <p id="trainerOpeningCaption">Choose an opening line, position, repair, or mixed due item.</p>
+              </article>
 
-          <div class="trainer-prompt-card">
-            <div class="prompt-copy">
-              <span class="prompt-label">Enter your move</span>
-              <p id="trainerAcceptedMeta" class="muted">Preferred moves count as correct answers when the position branches.</p>
+              <article class="board-detail-card">
+                <span class="board-detail-label">Review status</span>
+                <strong id="trainerOpponentMove">Waiting</strong>
+                <p id="trainerOpponentMeta">Due state, last result, and queue context appear here.</p>
+              </article>
             </div>
 
-            <form id="trainerForm" class="trainer-form">
-              <div class="trainer-answer-row">
-                <input id="trainerAnswerInput" placeholder="Bc4, Nf3, ...Bb6" autocomplete="off" />
-                <button id="trainerSubmitBtn" class="button button-primary" type="submit">Check</button>
+            <div class="line-block">
+              <div class="line-label">Prompt</div>
+              <h4 id="trainerPositionTitle">Trainer waiting</h4>
+              <div id="trainerPositionLine" class="line-strip"></div>
+            </div>
+
+            <div class="trainer-prompt-card">
+              <div class="prompt-copy">
+                <span class="prompt-label">Answer / recall</span>
+                <p id="trainerAcceptedMeta" class="muted">Openings check your move. Positions and repairs let you reveal, think, then grade the recall honestly.</p>
               </div>
-            </form>
 
-            <div class="trainer-actions">
-              <button id="whyPromptBtn" class="button button-ghost button-tiny" type="button">Wanna know why?</button>
-              <button id="revealPromptBtn" class="button button-secondary button-tiny" type="button">Reveal answer</button>
-              <button id="continueTrainingBtn" class="button button-primary button-tiny" type="button">Continue line</button>
-              <button id="nextTrainingBtn" class="button button-secondary button-tiny" type="button">Next line</button>
+              <form id="trainerForm" class="trainer-form">
+                <div class="trainer-answer-row">
+                  <input id="trainerAnswerInput" placeholder="Bc4, Nf3, Lucena bridge, ...Bb6" autocomplete="off" />
+                  <button id="trainerSubmitBtn" class="button button-primary" type="submit">Check</button>
+                </div>
+              </form>
+
+              <div class="trainer-actions">
+                <button id="whyPromptBtn" class="button button-ghost button-tiny" type="button">Why?</button>
+                <button id="revealPromptBtn" class="button button-secondary button-tiny" type="button">Reveal</button>
+                <button id="continueTrainingBtn" class="button button-primary button-tiny" type="button">Continue</button>
+                <button id="nextTrainingBtn" class="button button-secondary button-tiny" type="button">Next item</button>
+              </div>
+
+              <div class="trainer-actions">
+                <button id="reviewAgainBtn" class="button button-ghost button-tiny" type="button">Again / Failed</button>
+                <button id="reviewHardBtn" class="button button-secondary button-tiny" type="button">Hard</button>
+                <button id="reviewGoodBtn" class="button button-primary button-tiny" type="button">Good</button>
+                <button id="reviewEasyBtn" class="button button-secondary button-tiny" type="button">Easy</button>
+              </div>
+
+              <p id="trainerHint" class="trainer-hint"></p>
+              <div id="trainerFeedback"></div>
+              <div id="trainerReveal"></div>
             </div>
-
-            <p id="trainerHint" class="trainer-hint"></p>
-            <div id="trainerFeedback"></div>
-            <div id="trainerReveal"></div>
           </div>
         </div>
-      </div>
+      </section>
     </section>
   </main>
 
   <footer class="page-shell page-footer">
-    <p>Choose the root, hear the reply, answer from the board, then continue the branch.</p>
+    <p>Review what is due, recall honestly, then schedule the next return.</p>
   </footer>
 
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
-  <script type="module" src="./js/app.js"></script>
+  <script type="module" src="./js/training.js"></script>
   <script>
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
   </script>

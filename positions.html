@@ -70,43 +70,147 @@
     <section class="panel position-guide-panel">
       <div class="section-heading">
         <div>
-          <p class="eyebrow">How this page works</p>
-          <h3>The Position Vault is a review shelf, not the capture tool.</h3>
+          <p class="eyebrow">Position capture</p>
+          <h3>Store positions from games, books, videos, websites, or random study.</h3>
           <p class="muted">
-            You usually do not create positions here from scratch. First capture a position from a real game moment, then come here to clean up the title, question, lesson, and links.
+            The vault now has two jobs: keep extracted game moments and let you create manual study cards directly from FEN when the position did not come from a PGN.
           </p>
         </div>
 
         <div class="stack-actions">
           <a class="button button-primary button-tiny" href="games.html">Open Games page</a>
-          <a class="button button-ghost button-tiny" href="repair.html">Open Repair page</a>
+          <button id="fillStartFenBtn" class="button button-ghost button-tiny" type="button">Use starting position</button>
         </div>
       </div>
 
       <div class="position-guide-grid">
         <article class="board-detail-card">
           <span class="board-detail-label">Step 1</span>
-          <strong>Go to Games</strong>
-          <p>Import or open one of your saved games, then click through the move list until you reach the exact decision point you want to remember.</p>
+          <strong>Paste FEN or capture from Games</strong>
+          <p>For game analysis, still save a position from the Games page. For books, PDFs, lessons, and random study, paste the FEN directly here.</p>
         </article>
 
         <article class="board-detail-card">
           <span class="board-detail-label">Step 2</span>
-          <strong>Save position card</strong>
-          <p>On that move, press <code>Save position card</code>. The app stores the board before the move, the line context, and any notes already attached to that moment.</p>
+          <strong>Name the human question</strong>
+          <p>Give the position a title, source, short question, best move, lesson, and tags so it becomes usable study material instead of a raw board snapshot.</p>
         </article>
 
         <article class="board-detail-card">
           <span class="board-detail-label">Step 3</span>
-          <strong>Come back here to refine it</strong>
-          <p>Edit the title, short question, best move idea, wrong idea, and final lesson so the position becomes a durable study asset instead of a raw snapshot.</p>
+          <strong>Review it later in Training</strong>
+          <p>Manual and game-linked positions both feed the Position Trainer and Mixed Due Review once review is enabled.</p>
         </article>
       </div>
 
-      <div class="position-guide-note">
-        <strong>What belongs in the vault?</strong>
-        <span>Critical opening forks, middlegame decisions you misplayed, tactical positions worth revisiting, and endgames where one clean principle matters.</span>
-      </div>
+      <form id="manualPositionForm" class="support-form-card">
+        <div class="section-heading">
+          <div>
+            <h4>Create manual position</h4>
+            <p class="muted">Minimum workflow: paste a valid FEN, then fill in the human notes.</p>
+          </div>
+          <button id="createManualPositionBtn" class="button button-primary button-tiny" type="submit">Save manual position</button>
+        </div>
+
+        <div class="support-form-grid">
+          <label class="support-form-span">
+            Title
+            <input id="manualPositionTitleInput" placeholder="Lucena bridge, defensive fortress, rook ending technique..." />
+          </label>
+
+          <label class="support-form-span">
+            FEN
+            <textarea id="manualFenInput" rows="3" placeholder="8/8/8/8/8/8/8/8 w - - 0 1"></textarea>
+          </label>
+
+          <label>
+            Side to move
+            <select id="manualSideToMoveInput">
+              <option value="w">White to move</option>
+              <option value="b">Black to move</option>
+            </select>
+          </label>
+
+          <label>
+            Position type
+            <select id="manualPositionTypeInput">
+              <option value="opening">Opening</option>
+              <option value="middlegame">Middlegame</option>
+              <option value="endgame">Endgame</option>
+              <option value="tactic">Tactic</option>
+              <option value="defense">Defense</option>
+              <option value="conversion">Conversion</option>
+              <option value="strategy">Strategy</option>
+              <option value="calculation">Calculation</option>
+              <option value="pawn_structure">Pawn structure</option>
+              <option value="king_safety">King safety</option>
+              <option value="rook_endgame">Rook endgame</option>
+              <option value="minor_piece_endgame">Minor-piece endgame</option>
+              <option value="queen_endgame">Queen endgame</option>
+              <option value="fortress">Fortress</option>
+              <option value="technique">Technique</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+
+          <label>
+            Source type
+            <select id="manualSourceTypeInput">
+              <option value="manual">Manual</option>
+              <option value="book">Book</option>
+              <option value="pdf">PDF</option>
+              <option value="course">Course</option>
+              <option value="website">Website</option>
+              <option value="video">Video</option>
+              <option value="puzzle">Puzzle</option>
+              <option value="coach_note">Coach note</option>
+              <option value="random_study">Random study</option>
+              <option value="tournament_prep">Tournament prep</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+
+          <label>
+            Source label
+            <input id="manualSourceLabelInput" placeholder="Book title, video name, coach note..." />
+          </label>
+
+          <label>
+            Source URL
+            <input id="manualSourceUrlInput" placeholder="Optional link" />
+          </label>
+
+          <label>
+            Short question
+            <input id="manualQuestionInput" placeholder="What is the cleanest human move here?" />
+          </label>
+
+          <label>
+            Best human move
+            <input id="manualBestMoveInput" placeholder="Rc8, Kf6, Bc4..." />
+          </label>
+
+          <label class="support-form-span">
+            Lesson
+            <textarea id="manualLessonInput" rows="3" placeholder="What should survive the board once the exact move is forgotten?"></textarea>
+          </label>
+
+          <label>
+            Themes
+            <input id="manualThemesInput" placeholder="fortress, opposition, prophylaxis..." />
+          </label>
+
+          <label>
+            Tags
+            <input id="manualTagsInput" placeholder="book, endgame, tournament prep..." />
+          </label>
+
+          <label class="support-inline-check">
+            <input id="manualReviewEnabledInput" type="checkbox" checked />
+            <span>Include in review</span>
+          </label>
+        </div>
+      </form>
     </section>
 
     <aside class="panel position-list-panel">
@@ -129,6 +233,15 @@
             <option value="defense">Defense</option>
             <option value="conversion">Conversion</option>
             <option value="strategy">Strategy</option>
+            <option value="calculation">Calculation</option>
+            <option value="pawn_structure">Pawn structure</option>
+            <option value="king_safety">King safety</option>
+            <option value="rook_endgame">Rook endgame</option>
+            <option value="minor_piece_endgame">Minor-piece endgame</option>
+            <option value="queen_endgame">Queen endgame</option>
+            <option value="fortress">Fortress</option>
+            <option value="technique">Technique</option>
+            <option value="custom">Custom</option>
           </select>
         </label>
 
@@ -147,7 +260,7 @@
           <div>
             <p class="eyebrow">Vault board</p>
             <h3 id="positionBoardTitle">No position selected</h3>
-            <p id="positionBoardSubtitle" class="muted">This page reviews saved positions. Capture one from the Games page first, then inspect and refine it here.</p>
+            <p id="positionBoardSubtitle" class="muted">Manual positions and game-linked positions both appear here.</p>
           </div>
           <div id="positionBoardMeta" class="status-pill">Waiting for position</div>
         </div>
@@ -225,7 +338,44 @@
                 <option value="defense">Defense</option>
                 <option value="conversion">Conversion</option>
                 <option value="strategy">Strategy</option>
+                <option value="calculation">Calculation</option>
+                <option value="pawn_structure">Pawn structure</option>
+                <option value="king_safety">King safety</option>
+                <option value="rook_endgame">Rook endgame</option>
+                <option value="minor_piece_endgame">Minor-piece endgame</option>
+                <option value="queen_endgame">Queen endgame</option>
+                <option value="fortress">Fortress</option>
+                <option value="technique">Technique</option>
+                <option value="custom">Custom</option>
               </select>
+            </label>
+
+            <label>
+              Source type
+              <select id="positionSourceTypeInput">
+                <option value="own_game">Own game</option>
+                <option value="manual">Manual</option>
+                <option value="book">Book</option>
+                <option value="pdf">PDF</option>
+                <option value="course">Course</option>
+                <option value="website">Website</option>
+                <option value="video">Video</option>
+                <option value="puzzle">Puzzle</option>
+                <option value="coach_note">Coach note</option>
+                <option value="random_study">Random study</option>
+                <option value="tournament_prep">Tournament prep</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+
+            <label>
+              Source label
+              <input id="positionSourceLabelInput" placeholder="Book title, course, coach note..." />
+            </label>
+
+            <label>
+              Source URL
+              <input id="positionSourceUrlInput" placeholder="Optional link" />
             </label>
 
             <label>
@@ -249,6 +399,21 @@
             </label>
 
             <label>
+              Candidate moves
+              <input id="positionCandidateMovesInput" placeholder="Nf3, d4, Qe2..." />
+            </label>
+
+            <label>
+              Difficulty
+              <input id="positionDifficultyInput" placeholder="low, normal, high, critical..." />
+            </label>
+
+            <label>
+              Priority
+              <input id="positionPriorityInput" placeholder="normal, high, critical..." />
+            </label>
+
+            <label>
               Correct idea
               <textarea id="positionCorrectIdeaInput" rows="4" placeholder="What concept or plan should be remembered here?"></textarea>
             </label>
@@ -261,6 +426,14 @@
             <label>
               Lesson
               <textarea id="positionLessonInput" rows="5" placeholder="Turn the moment into a reusable lesson, not just a note dump."></textarea>
+            </label>
+
+            <label class="check-row">
+              <input id="positionReviewEnabledInput" type="checkbox" />
+              <span>
+                Include in review queue
+                <small>This position can appear in Training > Positions and Mixed Due Review.</small>
+              </span>
             </label>
           </div>
         </section>

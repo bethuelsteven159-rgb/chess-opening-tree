@@ -18,5 +18,7 @@ window.APP_CONFIG = {
   BOOKS_TABLE_NAME: "books",
   BOOK_NOTES_TABLE_NAME: "book_notes",
   TOURNAMENT_NOTES_TABLE_NAME: "tournament_notes",
-  QUICK_IDEAS_TABLE_NAME: "quick_ideas"
+  QUICK_IDEAS_TABLE_NAME: "quick_ideas",
+  REVIEW_ITEMS_TABLE_NAME: "review_items",
+  REPAIR_ATTEMPTS_TABLE_NAME: "repair_attempts"
 };

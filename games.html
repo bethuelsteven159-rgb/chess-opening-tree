@@ -187,11 +187,12 @@
         <div class="section-heading side-panel-heading">
           <div>
             <h3>Game meta</h3>
-            <p class="muted">Store the overall lesson and track how far the analysis is finished.</p>
+            <p class="muted">Store the overall lesson, watch the close-the-loop checklist, and mark the analysis complete when the game is truly closed.</p>
           </div>
 
           <div class="stack-actions side-panel-actions">
             <button id="saveGameMetaBtn" class="button button-secondary button-tiny" type="button">Save meta</button>
+            <button id="markGameCompleteBtn" class="button button-primary button-tiny" type="button">Mark analysis complete</button>
             <button id="deleteGameBtn" class="button button-danger button-tiny" type="button">Delete game</button>
           </div>
         </div>
@@ -215,6 +216,13 @@
               Summary lesson
               <textarea id="gameSummaryInput" rows="5" placeholder="Where did the game turn, what theme mattered, and what must be remembered next time?"></textarea>
             </label>
+          </div>
+
+          <div class="line-block">
+            <div class="line-label">Close the loop</div>
+            <div id="gameChecklist" class="queue-list">
+              <div class="line-empty">Import a game and the analysis checklist will appear here.</div>
+            </div>
           </div>
         </div>
       </section>

@@ -1,5 +1,6 @@
 import { requireOnlyMe } from "./auth/only-me-guard.js";
 import { initPageChrome } from "./ui-shell.js";
+import { ensureReviewItem } from "./review-utils.js";
 import {
   $,
   boardViewFromFen,
@@ -30,6 +31,7 @@ let games = [];
 let repairs = [];
 let positions = [];
 let mistakes = [];
+let reviewItems = [];
 let selectedPositionId = localStorage.getItem(SELECTED_POSITION_STORAGE_KEY) || null;
 
 function saveSelection() {
@@ -51,6 +53,10 @@ function linkedRepair(position) {
 
 function linkedOpening(position) {
   return nodes.find(node => node.id === position?.linked_opening_node_id) || null;
+}
+
+function reviewItemForPosition(id) {
+  return reviewItems.find(item => item.source_type === "position" && item.source_id === id) || null;
 }
 
 function selectPosition(id) {
@@ -75,6 +81,9 @@ function filteredPositions() {
       position.wrong_idea,
       position.human_evaluation,
       position.pgn_context,
+      position.source_type,
+      position.source_label,
+      position.source_url,
       ...(position.themes || []),
       ...(position.tags || [])
     ].join(" ").toLowerCase();
@@ -104,7 +113,7 @@ function renderPositionList() {
         <span class="muted">${escapeHtml(position.short_question || sourceGame?.opening_name || "No question yet")}</span>
         <div class="game-list-meta">
           <span>${escapeHtml(position.side_to_move === "b" ? "Black to move" : "White to move")}</span>
-          <span>${escapeHtml(sourceGame ? gameTitle(sourceGame) : position.source_type || "No source")}</span>
+          <span>${escapeHtml(sourceGame ? gameTitle(sourceGame) : position.source_label || position.source_type || "No source")}</span>
         </div>
       </button>
     `;
@@ -112,8 +121,7 @@ function renderPositionList() {
     <div class="support-empty-state">
       <div>
         <strong>No positions stored yet.</strong>
-        <p>To create one: open <code>Games</code>, choose a move, then press <code>Save position card</code>.</p>
-        <p><a class="button button-primary button-tiny" href="games.html">Go to Games</a></p>
+        <p>Paste a FEN in the manual form above, or open <code>Games</code> and press <code>Save position card</code>.</p>
       </div>
     </div>
   `;
@@ -128,12 +136,12 @@ function renderBoard() {
     const view = boardViewFromFen("");
     board.innerHTML = view.html;
     setText("positionBoardTitle", "No position selected");
-    setText("positionBoardSubtitle", "This page reviews saved positions. Capture one from the Games page first, then inspect and refine it here.");
+    setText("positionBoardSubtitle", "Manual positions and game-linked positions both appear here.");
     setText("positionBoardMeta", "Waiting for position");
     setText("positionTypeValue", "Position");
     setText("positionTypeCaption", "The stored position family will appear here.");
     setText("positionSourceValue", "No source yet");
-    setText("positionSourceCaption", "Game origin and opening link will appear here.");
+    setText("positionSourceCaption", "Book, video, game, or manual source details appear here.");
     setText("positionLinkedValue", "No repair yet");
     setText("positionLinkedCaption", "Mistakes and repairs linked to this position will be summarized here.");
     setText("positionContextValue", "Stored move context will show here when a position is tied to a game or line.");
@@ -152,10 +160,11 @@ function renderBoard() {
   setText("positionBoardMeta", view.turnText);
   setText("positionTypeValue", position.position_type || "Position");
   setText("positionTypeCaption", position.human_evaluation || "Add a quick human evaluation to orient the board.");
-  setText("positionSourceValue", sourceGame ? gameTitle(sourceGame) : (position.source_type || "No source yet"));
+  setText("positionSourceValue", sourceGame ? gameTitle(sourceGame) : (position.source_label || position.source_type || "No source yet"));
   setText(
     "positionSourceCaption",
     [
+      position.source_url,
       sourceGame?.opening_name,
       opening?.title || opening?.move,
       sourceGame?.result
@@ -177,33 +186,47 @@ function renderEditor() {
 
   setText("positionEditorState", position
     ? `Editing ${position.title || "selected position"}.`
-    : "Select a saved vault entry to edit the human question, move idea, and lesson. New positions are created from the Games page.");
+    : "Select a saved vault entry to edit the human question, move idea, lesson, and review settings.");
   setText("positionLinkBanner", position
-    ? `${position.source_type || "position"} source • ${position.side_to_move === "b" ? "Black to move" : "White to move"}`
-    : "No position selected yet. Capture a position from Games, then it will appear here.");
+    ? `${position.source_label || position.source_type || "position"} source • ${position.side_to_move === "b" ? "Black to move" : "White to move"}`
+    : "No position selected yet. Manual or game-linked positions will appear here.");
 
   if ($("positionTitleInput")) $("positionTitleInput").value = position?.title || "";
   if ($("positionQuestionInput")) $("positionQuestionInput").value = position?.short_question || "";
   if ($("positionTypeInput")) $("positionTypeInput").value = position?.position_type || "middlegame";
+  if ($("positionSourceTypeInput")) $("positionSourceTypeInput").value = position?.source_type || "manual";
+  if ($("positionSourceLabelInput")) $("positionSourceLabelInput").value = position?.source_label || "";
+  if ($("positionSourceUrlInput")) $("positionSourceUrlInput").value = position?.source_url || "";
   if ($("positionThemesInput")) $("positionThemesInput").value = (position?.themes || []).join(", ");
   if ($("positionTagsInput")) $("positionTagsInput").value = (position?.tags || []).join(", ");
   if ($("positionEvaluationInput")) $("positionEvaluationInput").value = position?.human_evaluation || "";
   if ($("positionBestMoveInput")) $("positionBestMoveInput").value = position?.best_human_move || "";
+  if ($("positionCandidateMovesInput")) $("positionCandidateMovesInput").value = (position?.candidate_moves || []).join(", ");
+  if ($("positionDifficultyInput")) $("positionDifficultyInput").value = position?.difficulty || "";
+  if ($("positionPriorityInput")) $("positionPriorityInput").value = position?.priority || "";
   if ($("positionCorrectIdeaInput")) $("positionCorrectIdeaInput").value = position?.correct_idea || "";
   if ($("positionWrongIdeaInput")) $("positionWrongIdeaInput").value = position?.wrong_idea || "";
   if ($("positionLessonInput")) $("positionLessonInput").value = position?.lesson || "";
+  if ($("positionReviewEnabledInput")) $("positionReviewEnabledInput").checked = position?.review_enabled !== false;
 
   [
     "positionTitleInput",
     "positionQuestionInput",
     "positionTypeInput",
+    "positionSourceTypeInput",
+    "positionSourceLabelInput",
+    "positionSourceUrlInput",
     "positionThemesInput",
     "positionTagsInput",
     "positionEvaluationInput",
     "positionBestMoveInput",
+    "positionCandidateMovesInput",
+    "positionDifficultyInput",
+    "positionPriorityInput",
     "positionCorrectIdeaInput",
     "positionWrongIdeaInput",
     "positionLessonInput",
+    "positionReviewEnabledInput",
     "savePositionBtn",
     "deletePositionBtn"
   ].forEach(id => {
@@ -220,11 +243,7 @@ function renderLinks() {
   const repair = linkedRepair(position);
   const relatedMistakes = mistakes.filter(mistake => mistake.position_id === position?.id);
 
-  [
-    "openPositionGameBtn",
-    "openPositionEditorBtn",
-    "openPositionRepairBtn"
-  ].forEach(id => {
+  ["openPositionGameBtn", "openPositionEditorBtn", "openPositionRepairBtn"].forEach(id => {
     const element = $(id);
     if (!element) return;
     element.disabled = disabled;
@@ -255,13 +274,54 @@ function paint() {
   renderLinks();
 }
 
+function completeFen(fenText, sideToMove = "w") {
+  const trimmed = String(fenText || "").trim();
+  if (!trimmed) return "";
+
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) return `${parts[0]} ${sideToMove} - - 0 1`;
+  if (parts.length === 2) return `${parts[0]} ${parts[1]} - - 0 1`;
+  return trimmed;
+}
+
+function validateFen(fenText, sideToMove = "w") {
+  const normalized = completeFen(fenText, sideToMove);
+  if (!normalized) throw new Error("Paste a FEN first.");
+  if (typeof window.Chess !== "function") throw new Error("chess.js is not available in this session.");
+
+  const game = new window.Chess();
+  const loaded = typeof game.load === "function" ? game.load(normalized) : false;
+  if (loaded === false) throw new Error("That FEN could not be loaded. Fix the board text and try again.");
+  return game.fen();
+}
+
+async function syncPositionReview(position) {
+  const existing = reviewItemForPosition(position.id);
+
+  if (position.review_enabled === false) {
+    if (existing) await OpeningDB.deleteReviewItem(existing.id);
+    return;
+  }
+
+  const reviewItem = ensureReviewItem(reviewItems, "position", position.id, position.title || "Position", {
+    priority: position.priority || "normal"
+  });
+  await OpeningDB.upsertReviewItem({
+    ...reviewItem,
+    source_label: position.title || reviewItem.source_label,
+    priority: position.priority || reviewItem.priority,
+    updated_at: new Date().toISOString()
+  });
+}
+
 async function refresh() {
-  [nodes, games, repairs, positions, mistakes] = await Promise.all([
+  [nodes, games, repairs, positions, mistakes, reviewItems] = await Promise.all([
     OpeningDB.loadNodes(),
     OpeningDB.loadGames(),
     OpeningDB.loadRepairItems(),
     OpeningDB.loadPositions(),
-    OpeningDB.loadMistakes()
+    OpeningDB.loadMistakes(),
+    OpeningDB.loadReviewItems ? OpeningDB.loadReviewItems() : Promise.resolve([])
   ]);
 
   if (selectedPositionId && !selectedPosition()) {
@@ -290,26 +350,97 @@ $("savePositionBtn")?.addEventListener("click", async () => {
   if (!position) return;
 
   try {
-    await OpeningDB.upsertPosition({
+    const updated = {
       ...position,
       title: $("positionTitleInput")?.value.trim() || "",
       short_question: $("positionQuestionInput")?.value.trim() || "",
       position_type: $("positionTypeInput")?.value || position.position_type,
+      source_type: $("positionSourceTypeInput")?.value || position.source_type,
+      source_label: $("positionSourceLabelInput")?.value.trim() || "",
+      source_url: $("positionSourceUrlInput")?.value.trim() || "",
       themes: tagsFromCommaText($("positionThemesInput")?.value || ""),
       tags: tagsFromCommaText($("positionTagsInput")?.value || ""),
       human_evaluation: $("positionEvaluationInput")?.value.trim() || "",
       best_human_move: $("positionBestMoveInput")?.value.trim() || "",
+      candidate_moves: tagsFromCommaText($("positionCandidateMovesInput")?.value || ""),
+      difficulty: $("positionDifficultyInput")?.value.trim() || "",
+      priority: $("positionPriorityInput")?.value.trim() || "",
       correct_idea: $("positionCorrectIdeaInput")?.value.trim() || "",
       wrong_idea: $("positionWrongIdeaInput")?.value.trim() || "",
       lesson: $("positionLessonInput")?.value.trim() || "",
+      review_enabled: $("positionReviewEnabledInput")?.checked === true,
       updated_at: new Date().toISOString()
-    });
+    };
 
+    await OpeningDB.upsertPosition(updated);
+    await syncPositionReview(updated);
     await refresh();
     showToast(navigator.onLine ? "Position saved." : "Position saved locally.");
   } catch (error) {
     reportActionError("Saving position", error);
   }
+});
+
+$("manualPositionForm")?.addEventListener("submit", async event => {
+  event.preventDefault();
+
+  try {
+    const fen = validateFen($("manualFenInput")?.value || "", $("manualSideToMoveInput")?.value || "w");
+    const now = new Date().toISOString();
+    const position = {
+      id: crypto.randomUUID(),
+      fen,
+      pgn_context: "",
+      side_to_move: String(fen.split(" ")[1] || $("manualSideToMoveInput")?.value || "w"),
+      move_number: null,
+      source_type: $("manualSourceTypeInput")?.value || "manual",
+      source_id: null,
+      source_label: $("manualSourceLabelInput")?.value.trim() || "",
+      source_url: $("manualSourceUrlInput")?.value.trim() || "",
+      title: $("manualPositionTitleInput")?.value.trim() || "Untitled manual position",
+      short_question: $("manualQuestionInput")?.value.trim() || "",
+      position_type: $("manualPositionTypeInput")?.value || "middlegame",
+      themes: tagsFromCommaText($("manualThemesInput")?.value || ""),
+      tags: tagsFromCommaText($("manualTagsInput")?.value || ""),
+      difficulty: "",
+      priority: "normal",
+      human_evaluation: "",
+      correct_idea: "",
+      wrong_idea: "",
+      candidate_moves: [],
+      best_human_move: $("manualBestMoveInput")?.value.trim() || "",
+      lesson: $("manualLessonInput")?.value.trim() || "",
+      linked_repair_id: null,
+      linked_opening_node_id: null,
+      linked_game_id: null,
+      linked_book_id: null,
+      linked_book_note_id: null,
+      review_enabled: $("manualReviewEnabledInput")?.checked === true,
+      last_reviewed_at: null,
+      next_review_at: null,
+      created_at: now,
+      updated_at: now
+    };
+
+    await OpeningDB.upsertPosition(position);
+    await syncPositionReview(position);
+    selectedPositionId = position.id;
+    saveSelection();
+    $("manualPositionForm")?.reset();
+    $("manualSideToMoveInput").value = "w";
+    $("manualPositionTypeInput").value = "opening";
+    $("manualSourceTypeInput").value = "manual";
+    $("manualReviewEnabledInput").checked = true;
+    await refresh();
+    showToast(navigator.onLine ? "Manual position saved." : "Manual position saved locally.");
+  } catch (error) {
+    reportActionError("Saving manual position", error);
+  }
+});
+
+$("fillStartFenBtn")?.addEventListener("click", () => {
+  $("manualFenInput").value = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  $("manualSideToMoveInput").value = "w";
 });
 
 $("deletePositionBtn")?.addEventListener("click", async () => {
@@ -368,5 +499,5 @@ $("syncBtn")?.addEventListener("click", async () => {
 try {
   await refresh();
 } catch (error) {
-  reportActionError("Loading position vault", error, "Run the updated supabase/schema.sql if the new Position Vault tables do not exist yet.");
+  reportActionError("Loading position vault", error, "Run the updated supabase/schema.sql if the final Position Vault tables do not exist in Supabase yet.");
 }

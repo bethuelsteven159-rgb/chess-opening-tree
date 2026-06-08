@@ -33,21 +33,48 @@ where exclude_from_training is distinct from not coalesce(is_practice_card, true
 create table if not exists repair_items (
   id uuid primary key default gen_random_uuid(),
   related_node_id uuid references opening_nodes(id) on delete set null,
+  linked_opening_node_id uuid references opening_nodes(id) on delete set null,
   position_path text default '',
   mistake text not null default '',
   lesson text not null default '',
   repair text not null default '',
-  status text not null default 'needs_work' check (status in ('needs_work', 'solved')),
-  created_at timestamptz default now()
+  repair_action text default '',
+  test_question text default '',
+  correct_response text default '',
+  linked_position_id uuid,
+  linked_game_id uuid,
+  linked_annotation_id uuid,
+  severity text not null default 'normal' check (severity in ('low', 'normal', 'high', 'critical')),
+  category text not null default 'other'
+    check (category in ('opening', 'middlegame', 'endgame', 'tactic', 'defense', 'conversion', 'strategy', 'calculation', 'psychology', 'time_management', 'other')),
+  status text not null default 'captured' check (status in ('captured', 'understood', 'scheduled', 'testing', 'solved', 'reopened')),
+  review_enabled boolean default true,
+  last_reviewed_at timestamptz,
+  next_review_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
 alter table repair_items add column if not exists related_node_id uuid references opening_nodes(id) on delete set null;
+alter table repair_items add column if not exists linked_opening_node_id uuid references opening_nodes(id) on delete set null;
 alter table repair_items add column if not exists position_path text default '';
 alter table repair_items add column if not exists mistake text not null default '';
 alter table repair_items add column if not exists lesson text not null default '';
 alter table repair_items add column if not exists repair text not null default '';
-alter table repair_items add column if not exists status text not null default 'needs_work';
+alter table repair_items add column if not exists repair_action text default '';
+alter table repair_items add column if not exists test_question text default '';
+alter table repair_items add column if not exists correct_response text default '';
+alter table repair_items add column if not exists linked_position_id uuid;
+alter table repair_items add column if not exists linked_game_id uuid;
+alter table repair_items add column if not exists linked_annotation_id uuid;
+alter table repair_items add column if not exists severity text not null default 'normal';
+alter table repair_items add column if not exists category text not null default 'other';
+alter table repair_items add column if not exists status text not null default 'captured';
+alter table repair_items add column if not exists review_enabled boolean default true;
+alter table repair_items add column if not exists last_reviewed_at timestamptz;
+alter table repair_items add column if not exists next_review_at timestamptz;
 alter table repair_items add column if not exists created_at timestamptz default now();
+alter table repair_items add column if not exists updated_at timestamptz default now();
 
 create table if not exists games (
   id uuid primary key default gen_random_uuid(),
@@ -79,6 +106,8 @@ create table if not exists games (
     )),
   linked_opening_node_id uuid references opening_nodes(id) on delete set null,
   linked_opening_title text default '',
+  analysis_complete boolean default false,
+  analysis_completed_at timestamptz,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -102,6 +131,8 @@ alter table games add column if not exists tags text[] default '{}';
 alter table games add column if not exists analysis_status text not null default 'imported_only';
 alter table games add column if not exists linked_opening_node_id uuid references opening_nodes(id) on delete set null;
 alter table games add column if not exists linked_opening_title text default '';
+alter table games add column if not exists analysis_complete boolean default false;
+alter table games add column if not exists analysis_completed_at timestamptz;
 alter table games add column if not exists created_at timestamptz default now();
 alter table games add column if not exists updated_at timestamptz default now();
 
@@ -113,10 +144,29 @@ create table if not exists positions (
   move_number integer,
   source_type text default '',
   source_id uuid,
+  source_label text default '',
+  source_url text default '',
   title text default '',
   short_question text default '',
   position_type text not null default 'middlegame'
-    check (position_type in ('opening', 'middlegame', 'endgame', 'tactic', 'defense', 'conversion', 'strategy')),
+    check (position_type in (
+      'opening',
+      'middlegame',
+      'endgame',
+      'tactic',
+      'defense',
+      'conversion',
+      'strategy',
+      'calculation',
+      'pawn_structure',
+      'king_safety',
+      'rook_endgame',
+      'minor_piece_endgame',
+      'queen_endgame',
+      'fortress',
+      'technique',
+      'custom'
+    )),
   themes text[] default '{}',
   tags text[] default '{}',
   difficulty text default '',
@@ -130,6 +180,11 @@ create table if not exists positions (
   linked_repair_id uuid references repair_items(id) on delete set null,
   linked_opening_node_id uuid references opening_nodes(id) on delete set null,
   linked_game_id uuid references games(id) on delete set null,
+  linked_book_id uuid,
+  linked_book_note_id uuid,
+  review_enabled boolean default true,
+  last_reviewed_at timestamptz,
+  next_review_at timestamptz,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -140,6 +195,8 @@ alter table positions add column if not exists side_to_move text not null defaul
 alter table positions add column if not exists move_number integer;
 alter table positions add column if not exists source_type text default '';
 alter table positions add column if not exists source_id uuid;
+alter table positions add column if not exists source_label text default '';
+alter table positions add column if not exists source_url text default '';
 alter table positions add column if not exists title text default '';
 alter table positions add column if not exists short_question text default '';
 alter table positions add column if not exists position_type text not null default 'middlegame';
@@ -156,6 +213,11 @@ alter table positions add column if not exists lesson text default '';
 alter table positions add column if not exists linked_repair_id uuid references repair_items(id) on delete set null;
 alter table positions add column if not exists linked_opening_node_id uuid references opening_nodes(id) on delete set null;
 alter table positions add column if not exists linked_game_id uuid references games(id) on delete set null;
+alter table positions add column if not exists linked_book_id uuid;
+alter table positions add column if not exists linked_book_note_id uuid;
+alter table positions add column if not exists review_enabled boolean default true;
+alter table positions add column if not exists last_reviewed_at timestamptz;
+alter table positions add column if not exists next_review_at timestamptz;
 alter table positions add column if not exists created_at timestamptz default now();
 alter table positions add column if not exists updated_at timestamptz default now();
 
@@ -456,6 +518,7 @@ create table if not exists book_notes (
   linked_opening_node_id uuid references opening_nodes(id) on delete set null,
   linked_position_id uuid references positions(id) on delete set null,
   linked_repair_id uuid references repair_items(id) on delete set null,
+  review_enabled boolean default false,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -471,6 +534,7 @@ alter table book_notes add column if not exists tags text[] default '{}';
 alter table book_notes add column if not exists linked_opening_node_id uuid references opening_nodes(id) on delete set null;
 alter table book_notes add column if not exists linked_position_id uuid references positions(id) on delete set null;
 alter table book_notes add column if not exists linked_repair_id uuid references repair_items(id) on delete set null;
+alter table book_notes add column if not exists review_enabled boolean default false;
 alter table book_notes add column if not exists created_at timestamptz default now();
 alter table book_notes add column if not exists updated_at timestamptz default now();
 
@@ -489,6 +553,9 @@ create table if not exists tournament_notes (
   round_notes text default '',
   after_event_lessons text default '',
   linked_goal_id uuid references goals(id) on delete set null,
+  linked_game_id uuid references games(id) on delete set null,
+  linked_position_id uuid references positions(id) on delete set null,
+  linked_repair_id uuid references repair_items(id) on delete set null,
   tags text[] default '{}',
   created_at timestamptz default now(),
   updated_at timestamptz default now()
@@ -507,6 +574,9 @@ alter table tournament_notes add column if not exists practical_checklist text d
 alter table tournament_notes add column if not exists round_notes text default '';
 alter table tournament_notes add column if not exists after_event_lessons text default '';
 alter table tournament_notes add column if not exists linked_goal_id uuid references goals(id) on delete set null;
+alter table tournament_notes add column if not exists linked_game_id uuid references games(id) on delete set null;
+alter table tournament_notes add column if not exists linked_position_id uuid references positions(id) on delete set null;
+alter table tournament_notes add column if not exists linked_repair_id uuid references repair_items(id) on delete set null;
 alter table tournament_notes add column if not exists tags text[] default '{}';
 alter table tournament_notes add column if not exists created_at timestamptz default now();
 alter table tournament_notes add column if not exists updated_at timestamptz default now();
@@ -535,12 +605,179 @@ alter table quick_ideas add column if not exists tags text[] default '{}';
 alter table quick_ideas add column if not exists created_at timestamptz default now();
 alter table quick_ideas add column if not exists updated_at timestamptz default now();
 
+create table if not exists review_items (
+  id uuid primary key default gen_random_uuid(),
+  source_type text not null default 'position'
+    check (source_type in ('opening_line', 'position', 'repair', 'book_note')),
+  source_id text not null default '',
+  source_label text default '',
+  due_at timestamptz,
+  last_reviewed_at timestamptz,
+  interval_days integer default 0,
+  ease_score numeric default 2.5,
+  review_count integer default 0,
+  success_count integer default 0,
+  fail_count integer default 0,
+  current_streak integer default 0,
+  lapse_count integer default 0,
+  priority text not null default 'normal' check (priority in ('low', 'normal', 'high', 'critical')),
+  status text not null default 'active' check (status in ('active', 'paused', 'archived')),
+  confidence_after_review integer,
+  review_notes text default '',
+  last_result text default '' check (last_result in ('', 'again', 'hard', 'good', 'easy')),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table review_items add column if not exists source_type text not null default 'position';
+alter table review_items add column if not exists source_id text not null default '';
+alter table review_items add column if not exists source_label text default '';
+alter table review_items add column if not exists due_at timestamptz;
+alter table review_items add column if not exists last_reviewed_at timestamptz;
+alter table review_items add column if not exists interval_days integer default 0;
+alter table review_items add column if not exists ease_score numeric default 2.5;
+alter table review_items add column if not exists review_count integer default 0;
+alter table review_items add column if not exists success_count integer default 0;
+alter table review_items add column if not exists fail_count integer default 0;
+alter table review_items add column if not exists current_streak integer default 0;
+alter table review_items add column if not exists lapse_count integer default 0;
+alter table review_items add column if not exists priority text not null default 'normal';
+alter table review_items add column if not exists status text not null default 'active';
+alter table review_items add column if not exists confidence_after_review integer;
+alter table review_items add column if not exists review_notes text default '';
+alter table review_items add column if not exists last_result text default '';
+alter table review_items add column if not exists created_at timestamptz default now();
+alter table review_items add column if not exists updated_at timestamptz default now();
+
+create table if not exists repair_attempts (
+  id uuid primary key default gen_random_uuid(),
+  repair_id uuid references repair_items(id) on delete cascade,
+  attempted_at timestamptz default now(),
+  result text not null default 'again' check (result in ('again', 'hard', 'good', 'easy')),
+  answer_text text default '',
+  confidence integer,
+  note text default '',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table repair_attempts add column if not exists repair_id uuid references repair_items(id) on delete cascade;
+alter table repair_attempts add column if not exists attempted_at timestamptz default now();
+alter table repair_attempts add column if not exists result text not null default 'again';
+alter table repair_attempts add column if not exists answer_text text default '';
+alter table repair_attempts add column if not exists confidence integer;
+alter table repair_attempts add column if not exists note text default '';
+alter table repair_attempts add column if not exists created_at timestamptz default now();
+alter table repair_attempts add column if not exists updated_at timestamptz default now();
+
+alter table repair_items drop constraint if exists repair_items_status_check;
+alter table repair_items drop constraint if exists repair_items_severity_check;
+alter table repair_items drop constraint if exists repair_items_category_check;
+alter table positions drop constraint if exists positions_position_type_check;
+alter table review_items drop constraint if exists review_items_source_type_check;
+alter table review_items drop constraint if exists review_items_priority_check;
+alter table review_items drop constraint if exists review_items_status_check;
+alter table review_items drop constraint if exists review_items_last_result_check;
+alter table repair_attempts drop constraint if exists repair_attempts_result_check;
+
+update repair_items
+set status = case
+  when status = 'needs_work' then 'captured'
+  when status = 'solved' then 'solved'
+  else status
+end
+where status in ('needs_work', 'solved');
+
+alter table repair_items
+  add constraint repair_items_status_check
+  check (status in ('captured', 'understood', 'scheduled', 'testing', 'solved', 'reopened'));
+
+alter table repair_items
+  add constraint repair_items_severity_check
+  check (severity in ('low', 'normal', 'high', 'critical'));
+
+alter table repair_items
+  add constraint repair_items_category_check
+  check (category in ('opening', 'middlegame', 'endgame', 'tactic', 'defense', 'conversion', 'strategy', 'calculation', 'psychology', 'time_management', 'other'));
+
+alter table positions
+  add constraint positions_position_type_check
+  check (position_type in (
+    'opening',
+    'middlegame',
+    'endgame',
+    'tactic',
+    'defense',
+    'conversion',
+    'strategy',
+    'calculation',
+    'pawn_structure',
+    'king_safety',
+    'rook_endgame',
+    'minor_piece_endgame',
+    'queen_endgame',
+    'fortress',
+    'technique',
+    'custom'
+  ));
+
+alter table review_items
+  add constraint review_items_source_type_check
+  check (source_type in ('opening_line', 'position', 'repair', 'book_note'));
+
+alter table review_items
+  add constraint review_items_priority_check
+  check (priority in ('low', 'normal', 'high', 'critical'));
+
+alter table review_items
+  add constraint review_items_status_check
+  check (status in ('active', 'paused', 'archived'));
+
+alter table review_items
+  add constraint review_items_last_result_check
+  check (last_result in ('', 'again', 'hard', 'good', 'easy'));
+
+alter table repair_attempts
+  add constraint repair_attempts_result_check
+  check (result in ('again', 'hard', 'good', 'easy'));
+
+alter table repair_items drop constraint if exists repair_items_linked_position_id_fkey;
+alter table repair_items drop constraint if exists repair_items_linked_game_id_fkey;
+alter table repair_items drop constraint if exists repair_items_linked_annotation_id_fkey;
+alter table positions drop constraint if exists positions_linked_book_id_fkey;
+alter table positions drop constraint if exists positions_linked_book_note_id_fkey;
+
+alter table repair_items
+  add constraint repair_items_linked_position_id_fkey
+  foreign key (linked_position_id) references positions(id) on delete set null;
+
+alter table repair_items
+  add constraint repair_items_linked_game_id_fkey
+  foreign key (linked_game_id) references games(id) on delete set null;
+
+alter table repair_items
+  add constraint repair_items_linked_annotation_id_fkey
+  foreign key (linked_annotation_id) references game_annotations(id) on delete set null;
+
+alter table positions
+  add constraint positions_linked_book_id_fkey
+  foreign key (linked_book_id) references books(id) on delete set null;
+
+alter table positions
+  add constraint positions_linked_book_note_id_fkey
+  foreign key (linked_book_note_id) references book_notes(id) on delete set null;
+
 create index if not exists opening_nodes_parent_idx on opening_nodes(parent_id);
 create index if not exists repair_items_related_node_idx on repair_items(related_node_id);
+create index if not exists repair_items_linked_opening_idx on repair_items(linked_opening_node_id);
+create index if not exists repair_items_linked_position_idx on repair_items(linked_position_id);
+create index if not exists repair_items_linked_game_idx on repair_items(linked_game_id);
 create index if not exists games_opening_idx on games(linked_opening_node_id);
 create index if not exists positions_game_idx on positions(linked_game_id);
 create index if not exists positions_opening_idx on positions(linked_opening_node_id);
 create index if not exists positions_repair_idx on positions(linked_repair_id);
+create index if not exists positions_book_idx on positions(linked_book_id);
+create index if not exists positions_book_note_idx on positions(linked_book_note_id);
 create index if not exists mistakes_position_idx on mistakes(position_id);
 create index if not exists mistakes_opening_idx on mistakes(linked_opening_node_id);
 create index if not exists game_annotations_game_idx on game_annotations(game_id);
@@ -554,7 +791,13 @@ create index if not exists app_reminders_goal_idx on app_reminders(linked_goal_i
 create index if not exists app_reminders_book_idx on app_reminders(linked_book_id);
 create index if not exists app_reminders_support_card_idx on app_reminders(linked_support_card_id);
 create index if not exists book_notes_book_idx on book_notes(book_id);
+create index if not exists review_items_source_idx on review_items(source_type, source_id);
+create index if not exists review_items_due_idx on review_items(due_at);
+create index if not exists repair_attempts_repair_idx on repair_attempts(repair_id);
 create index if not exists tournament_notes_goal_idx on tournament_notes(linked_goal_id);
+create index if not exists tournament_notes_game_idx on tournament_notes(linked_game_id);
+create index if not exists tournament_notes_position_idx on tournament_notes(linked_position_id);
+create index if not exists tournament_notes_repair_idx on tournament_notes(linked_repair_id);
 
 alter table opening_nodes enable row level security;
 alter table repair_items enable row level security;
@@ -569,6 +812,8 @@ alter table books enable row level security;
 alter table book_notes enable row level security;
 alter table tournament_notes enable row level security;
 alter table quick_ideas enable row level security;
+alter table review_items enable row level security;
+alter table repair_attempts enable row level security;
 
 drop policy if exists "Allow public read" on opening_nodes;
 drop policy if exists "Allow public insert" on opening_nodes;
@@ -841,4 +1086,46 @@ using (true);
 
 create policy "Allow public delete"
 on quick_ideas for delete
+using (true);
+
+drop policy if exists "Allow public read" on review_items;
+drop policy if exists "Allow public insert" on review_items;
+drop policy if exists "Allow public update" on review_items;
+drop policy if exists "Allow public delete" on review_items;
+
+create policy "Allow public read"
+on review_items for select
+using (true);
+
+create policy "Allow public insert"
+on review_items for insert
+with check (true);
+
+create policy "Allow public update"
+on review_items for update
+using (true);
+
+create policy "Allow public delete"
+on review_items for delete
+using (true);
+
+drop policy if exists "Allow public read" on repair_attempts;
+drop policy if exists "Allow public insert" on repair_attempts;
+drop policy if exists "Allow public update" on repair_attempts;
+drop policy if exists "Allow public delete" on repair_attempts;
+
+create policy "Allow public read"
+on repair_attempts for select
+using (true);
+
+create policy "Allow public insert"
+on repair_attempts for insert
+with check (true);
+
+create policy "Allow public update"
+on repair_attempts for update
+using (true);
+
+create policy "Allow public delete"
+on repair_attempts for delete
 using (true);

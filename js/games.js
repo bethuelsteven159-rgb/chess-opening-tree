@@ -1,5 +1,7 @@
 import { requireOnlyMe } from "./auth/only-me-guard.js";
 import { bindImportButton, initPageChrome } from "./ui-shell.js";
+import { checklistForGame, checklistProgress, gameNeedsWork, gameStatusLabel } from "./game-analysis-utils.js";
+import { getStoredBoardAppearance } from "./board-appearance.js";
 import {
   $,
   annotationLabel,
@@ -16,7 +18,6 @@ import {
   setHtml,
   setText,
   showToast,
-  statusLabel,
   tagsFromCommaText
 } from "./chess-brain-utils.js";
 
@@ -46,6 +47,15 @@ let games = [];
 let annotations = [];
 let positions = [];
 let mistakes = [];
+let reviewItems = [];
+let repairAttempts = [];
+let supportCards = [];
+let goals = [];
+let appReminders = [];
+let books = [];
+let bookNotes = [];
+let tournamentNotes = [];
+let quickIdeas = [];
 let selectedGameId = localStorage.getItem(SELECTED_GAME_STORAGE_KEY) || null;
 let selectedPly = Number.parseInt(localStorage.getItem(SELECTED_GAME_PLY_STORAGE_KEY) || "0", 10) || 0;
 
@@ -199,20 +209,30 @@ function disableIds(ids, disabled) {
 
 function fullBackupPayload() {
   return {
-    version: 6,
+    version: 8,
     exported_at: new Date().toISOString(),
     nodes,
     repairs,
     games,
     game_annotations: annotations,
     positions,
-    mistakes
+    mistakes,
+    review_items: reviewItems,
+    repair_attempts: repairAttempts,
+    support_cards: supportCards,
+    goals,
+    app_reminders: appReminders,
+    books,
+    book_notes: bookNotes,
+    tournament_notes: tournamentNotes,
+    quick_ideas: quickIdeas,
+    board_settings: getStoredBoardAppearance()
   };
 }
 
 function renderIntroStats() {
   const criticalMoments = annotations.filter(annotation => annotation.is_critical).length;
-  const needsWork = games.filter(game => !["lessons_extracted", "repairs_created"].includes(game.analysis_status)).length;
+  const needsWork = games.filter(game => gameNeedsWork(game, annotations)).length;
 
   setText("gameCountPill", `${games.length} game${games.length === 1 ? "" : "s"} stored`);
   setText("criticalCountPill", `${criticalMoments} critical moment${criticalMoments === 1 ? "" : "s"}`);
@@ -231,7 +251,7 @@ function renderGameList() {
 
     return `
       <button class="game-list-card${selectedClass}" data-game-id="${game.id}" type="button">
-        <span class="study-choice-kicker">${escapeHtml(statusLabel(game.analysis_status))}</span>
+        <span class="study-choice-kicker">${escapeHtml(game.analysis_complete ? "Complete" : gameStatusLabel(game.analysis_status))}</span>
         <strong>${escapeHtml(gameTitle(game))}</strong>
         <span class="muted">${escapeHtml(gameSubtitle(game) || "No subtitle yet")}</span>
         <div class="game-list-meta">
@@ -290,8 +310,10 @@ function renderReplayBoard() {
   setText("gameOpeningCaption", currentMatch
     ? `Matched your tree through ${currentMatch.move}.`
     : "This line has not matched a stored opening branch yet.");
-  setText("gameStatusValue", statusLabel(game.analysis_status));
-  setText("gameStatusCaption", game.summary || "Capture the overall lesson when the game story becomes clear.");
+  setText("gameStatusValue", game.analysis_complete ? "Analysis complete" : gameStatusLabel(game.analysis_status));
+  setText("gameStatusCaption", game.analysis_complete
+    ? (game.summary || "This game is marked analysis complete.")
+    : (game.summary || "Capture the overall lesson when the game story becomes clear."));
   board.innerHTML = boardView.html;
 
   setHtml("gameMoveList", currentAnnotations.map(move => {
@@ -324,7 +346,31 @@ function renderGameMeta() {
     $("gameSummaryInput").value = game?.summary || "";
   }
 
+  if ($("markGameCompleteBtn")) {
+    $("markGameCompleteBtn").disabled = disabled;
+    $("markGameCompleteBtn").textContent = game?.analysis_complete ? "Marked complete" : "Mark analysis complete";
+  }
+
   disableIds(["analysisStatusInput", "gameSummaryInput", "saveGameMetaBtn", "deleteGameBtn"], disabled);
+}
+
+function renderChecklist() {
+  const game = selectedGame();
+  const host = $("gameChecklist");
+  if (!host) return;
+
+  if (!game) {
+    host.innerHTML = `<div class="line-empty">Import a game and the analysis checklist will appear here.</div>`;
+    return;
+  }
+
+  const checklist = checklistForGame(game, annotations);
+  host.innerHTML = checklist.map(item => `
+    <article class="heatmap-row">
+      <strong>${escapeHtml(item.label)}</strong>
+      <span>${item.done ? "Done" : "Open"}</span>
+    </article>
+  `).join("");
 }
 
 function renderAnnotationEditor() {
@@ -395,6 +441,7 @@ function paint() {
   renderGameList();
   renderReplayBoard();
   renderGameMeta();
+  renderChecklist();
   renderAnnotationEditor();
   updateReplayControls();
 }
@@ -422,6 +469,8 @@ function buildImportedGame(headers, bundle) {
     summary: "",
     tags: tagsFromCommaText($("gameTagsInput")?.value || ""),
     analysis_status: "imported_only",
+    analysis_complete: false,
+    analysis_completed_at: null,
     linked_opening_node_id: matchedOpening?.id || null,
     linked_opening_title: matchedOpening?.title || matchedOpening?.move || "",
     created_at: now,
@@ -464,6 +513,8 @@ async function saveGameMeta() {
     ...game,
     analysis_status: $("analysisStatusInput")?.value || game.analysis_status,
     summary: $("gameSummaryInput")?.value.trim() || "",
+    analysis_complete: game.analysis_complete === true,
+    analysis_completed_at: game.analysis_completed_at || null,
     updated_at: new Date().toISOString()
   };
 
@@ -520,6 +571,8 @@ async function ensurePositionFromCurrentMove() {
     side_to_move: parseFenTurn(annotation.fen_before),
     move_number: annotation.move_number,
     source_type: "game",
+    source_label: gameTitle(game),
+    source_url: "",
     source_id: game.id,
     title: `Position before ${annotationLabel(annotation)}`,
     short_question: `What should be understood before ${annotationLabel(annotation)}?`,
@@ -537,6 +590,11 @@ async function ensurePositionFromCurrentMove() {
     linked_repair_id: null,
     linked_opening_node_id: linkedOpening?.id || game.linked_opening_node_id || null,
     linked_game_id: game.id,
+    linked_book_id: null,
+    linked_book_note_id: null,
+    review_enabled: true,
+    last_reviewed_at: null,
+    next_review_at: null,
     created_at: now,
     updated_at: now
   });
@@ -630,12 +688,25 @@ async function ensureRepairFromCurrentMove() {
   const repair = await OpeningDB.upsertRepairItem({
     id: crypto.randomUUID(),
     related_node_id: linkedOpening?.id || game.linked_opening_node_id || null,
+    linked_opening_node_id: linkedOpening?.id || game.linked_opening_node_id || null,
     position_path: lineTextFromAnnotations(selectedGameAnnotations(), annotation.ply),
     mistake: mistake?.title || `Mistake at ${annotationLabel(annotation)}`,
     lesson: annotation.human_comment_after || mistake?.correct_thinking_rule || "Capture the lesson from this move.",
     repair: position?.lesson || "Replay the position and rehearse the correct human plan.",
-    status: "needs_work",
-    created_at: now
+    repair_action: position?.lesson || "Replay the position and rehearse the correct human plan.",
+    test_question: annotation.human_comment_before || `What should be remembered before ${annotationLabel(annotation)}?`,
+    correct_response: annotation.human_comment_after || position?.best_human_move || "",
+    linked_position_id: position?.id || null,
+    linked_game_id: game.id,
+    linked_annotation_id: annotation.id,
+    severity: annotation.is_critical ? "high" : "normal",
+    category: inferMistakeCategory(annotation) === "tactics" ? "tactic" : inferPositionType(annotation),
+    status: "captured",
+    review_enabled: true,
+    last_reviewed_at: null,
+    next_review_at: null,
+    created_at: now,
+    updated_at: now
   });
 
   await OpeningDB.upsertGameAnnotation({
@@ -662,13 +733,38 @@ async function ensureRepairFromCurrentMove() {
 }
 
 async function refresh() {
-  [nodes, repairs, games, annotations, positions, mistakes] = await Promise.all([
+  [
+    nodes,
+    repairs,
+    games,
+    annotations,
+    positions,
+    mistakes,
+    reviewItems,
+    repairAttempts,
+    supportCards,
+    goals,
+    appReminders,
+    books,
+    bookNotes,
+    tournamentNotes,
+    quickIdeas
+  ] = await Promise.all([
     OpeningDB.loadNodes(),
     OpeningDB.loadRepairItems(),
     OpeningDB.loadGames(),
     OpeningDB.loadGameAnnotations(),
     OpeningDB.loadPositions(),
-    OpeningDB.loadMistakes()
+    OpeningDB.loadMistakes(),
+    OpeningDB.loadReviewItems ? OpeningDB.loadReviewItems() : Promise.resolve([]),
+    OpeningDB.loadRepairAttempts ? OpeningDB.loadRepairAttempts() : Promise.resolve([]),
+    OpeningDB.loadSupportCards(),
+    OpeningDB.loadGoals(),
+    OpeningDB.loadAppReminders(),
+    OpeningDB.loadBooks(),
+    OpeningDB.loadBookNotes(),
+    OpeningDB.loadTournamentNotes(),
+    OpeningDB.loadQuickIdeas()
   ]);
 
   if (selectedGameId && !selectedGame()) {
@@ -734,6 +830,25 @@ $("saveGameMetaBtn")?.addEventListener("click", async () => {
     await saveGameMeta();
   } catch (error) {
     reportActionError("Saving game meta", error);
+  }
+});
+
+$("markGameCompleteBtn")?.addEventListener("click", async () => {
+  const game = selectedGame();
+  if (!game) return;
+
+  try {
+    await OpeningDB.upsertGame({
+      ...game,
+      analysis_complete: true,
+      analysis_completed_at: new Date().toISOString(),
+      analysis_status: game.analysis_status === "imported_only" ? "human_analysis_complete" : game.analysis_status,
+      updated_at: new Date().toISOString()
+    });
+    await refresh();
+    showToast("Game marked analysis complete.");
+  } catch (error) {
+    reportActionError("Marking game complete", error);
   }
 });
 

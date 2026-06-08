@@ -34,7 +34,9 @@ if (!window.OpeningDB) {
 
 const SELECTED_BOOK_STORAGE_KEY = "gm_brain_selected_support_book_v1";
 const SELECTED_SUPPORT_PANE_STORAGE_KEY = "gm_brain_selected_support_pane_v1";
+const SUPPORT_FOCUS_STORAGE_KEY = "gm_support_focus_v1";
 const SUPPORT_PANES = new Set(["quick", "goals", "reminders", "books", "cards", "tournaments", "ideas"]);
+const STARTING_POSITION_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 const SUPPORT_CARD_LABELS = {
   identity: "Identity",
@@ -132,6 +134,9 @@ let books = [];
 let bookNotes = [];
 let tournamentNotes = [];
 let quickIdeas = [];
+let linkedGames = [];
+let linkedPositions = [];
+let linkedRepairs = [];
 let selectedBookId = localStorage.getItem(SELECTED_BOOK_STORAGE_KEY) || null;
 let randomCardId = null;
 let selectedSupportPane = localStorage.getItem(SELECTED_SUPPORT_PANE_STORAGE_KEY) || "quick";
@@ -142,6 +147,19 @@ if (!SUPPORT_PANES.has(selectedSupportPane)) {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function consumeSupportFocus() {
+  const raw = localStorage.getItem(SUPPORT_FOCUS_STORAGE_KEY);
+  if (!raw) return null;
+  localStorage.removeItem(SUPPORT_FOCUS_STORAGE_KEY);
+
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 function saveSelectedSupportPane() {
@@ -183,6 +201,71 @@ function tournamentNoteById(id) {
 
 function quickIdeaById(id) {
   return quickIdeas.find(idea => idea.id === id) || null;
+}
+
+async function createDraftPositionFromText({ title, body, tags, sourceType = "manual", sourceLabel = "" }) {
+  const stamp = nowIso();
+  return OpeningDB.upsertPosition({
+    id: crypto.randomUUID(),
+    fen: STARTING_POSITION_FEN,
+    pgn_context: "",
+    side_to_move: "w",
+    move_number: null,
+    source_type: sourceType,
+    source_id: null,
+    source_label: sourceLabel,
+    source_url: "",
+    title: title || "Untitled position",
+    short_question: "",
+    position_type: "custom",
+    themes: [],
+    tags,
+    difficulty: "",
+    priority: "normal",
+    human_evaluation: "",
+    correct_idea: "",
+    wrong_idea: "",
+    candidate_moves: [],
+    best_human_move: "",
+    lesson: body || "",
+    linked_repair_id: null,
+    linked_opening_node_id: null,
+    linked_game_id: null,
+    linked_book_id: null,
+    linked_book_note_id: null,
+    review_enabled: true,
+    last_reviewed_at: null,
+    next_review_at: null,
+    created_at: stamp,
+    updated_at: stamp
+  });
+}
+
+async function createRepairFromText({ title, body, tags }) {
+  const stamp = nowIso();
+  return OpeningDB.upsertRepairItem({
+    id: crypto.randomUUID(),
+    related_node_id: null,
+    linked_opening_node_id: null,
+    position_path: "",
+    mistake: title || "Untitled repair",
+    lesson: body || "",
+    repair: body || "",
+    repair_action: body || "",
+    test_question: "",
+    correct_response: "",
+    linked_position_id: null,
+    linked_game_id: null,
+    linked_annotation_id: null,
+    severity: "normal",
+    category: "other",
+    status: "captured",
+    review_enabled: true,
+    last_reviewed_at: null,
+    next_review_at: null,
+    created_at: stamp,
+    updated_at: stamp
+  });
 }
 
 function labelize(value, labels = {}) {
@@ -520,6 +603,9 @@ function resetTournamentForm() {
   $("tournamentSectionInput").value = "";
   $("tournamentStatusInput").value = "planned";
   $("tournamentLinkedGoalInput").value = "";
+  $("tournamentLinkedGameInput").value = "";
+  $("tournamentLinkedPositionInput").value = "";
+  $("tournamentLinkedRepairInput").value = "";
   $("tournamentPreGoalInput").value = "";
   $("tournamentOpeningFocusInput").value = "";
   $("tournamentMentalFocusInput").value = "";
@@ -544,6 +630,33 @@ function fillTournamentForm(note) {
   $("tournamentSectionInput").value = note.section || "";
   $("tournamentStatusInput").value = note.status || "planned";
   fillSelectOptions("tournamentLinkedGoalInput", goals, note.linked_goal_id || "", "No linked goal");
+  fillSelectOptions(
+    "tournamentLinkedGameInput",
+    linkedGames.map(game => ({
+      id: game.id,
+      title: game.event || `${game.white_player || "White"} vs ${game.black_player || "Black"}`
+    })),
+    note.linked_game_id || "",
+    "No linked game"
+  );
+  fillSelectOptions(
+    "tournamentLinkedPositionInput",
+    linkedPositions.map(position => ({
+      id: position.id,
+      title: position.title || "Untitled position"
+    })),
+    note.linked_position_id || "",
+    "No linked position"
+  );
+  fillSelectOptions(
+    "tournamentLinkedRepairInput",
+    linkedRepairs.map(repair => ({
+      id: repair.id,
+      title: repair.mistake || "Repair card"
+    })),
+    note.linked_repair_id || "",
+    "No linked repair"
+  );
   $("tournamentPreGoalInput").value = note.pre_event_goal || "";
   $("tournamentOpeningFocusInput").value = note.opening_focus || "";
   $("tournamentMentalFocusInput").value = note.mental_focus || "";
@@ -589,6 +702,33 @@ function populateLinkedSelects() {
   fillSelectOptions("reminderLinkedSupportCardInput", supportCards, $("reminderLinkedSupportCardInput")?.value || "", "No linked card");
 
   fillSelectOptions("tournamentLinkedGoalInput", goals, $("tournamentLinkedGoalInput")?.value || "", "No linked goal");
+  fillSelectOptions(
+    "tournamentLinkedGameInput",
+    linkedGames.map(game => ({
+      id: game.id,
+      title: game.event || `${game.white_player || "White"} vs ${game.black_player || "Black"}`
+    })),
+    $("tournamentLinkedGameInput")?.value || "",
+    "No linked game"
+  );
+  fillSelectOptions(
+    "tournamentLinkedPositionInput",
+    linkedPositions.map(position => ({
+      id: position.id,
+      title: position.title || "Untitled position"
+    })),
+    $("tournamentLinkedPositionInput")?.value || "",
+    "No linked position"
+  );
+  fillSelectOptions(
+    "tournamentLinkedRepairInput",
+    linkedRepairs.map(repair => ({
+      id: repair.id,
+      title: repair.mistake || "Repair card"
+    })),
+    $("tournamentLinkedRepairInput")?.value || "",
+    "No linked repair"
+  );
 }
 
 function filteredGoals() {
@@ -998,6 +1138,9 @@ function renderBookNotes() {
       ${tagRowHtml(note.tags)}
       <div class="form-actions">
         <button class="button button-secondary button-tiny" type="button" data-book-note-action="edit" data-book-note-id="${note.id}">Edit</button>
+        <button class="button button-ghost button-tiny" type="button" data-book-note-action="position" data-book-note-id="${note.id}">To position</button>
+        <button class="button button-ghost button-tiny" type="button" data-book-note-action="card" data-book-note-id="${note.id}">To card</button>
+        <button class="button button-ghost button-tiny" type="button" data-book-note-action="repair" data-book-note-id="${note.id}">To repair</button>
         <button class="button button-danger button-tiny" type="button" data-book-note-action="delete" data-book-note-id="${note.id}">Delete</button>
       </div>
     </article>
@@ -1087,6 +1230,12 @@ function renderTournamentNotes() {
         </div>
       </div>
       <p class="muted">${escapeHtml(excerpt(note.pre_event_goal || note.mental_focus || note.after_event_lessons, 160) || "No focus note yet.")}</p>
+      <div class="move-ply-flags">
+        ${note.linked_goal_id ? badgeHtml("Goal link") : ""}
+        ${note.linked_game_id ? badgeHtml("Game link") : ""}
+        ${note.linked_position_id ? badgeHtml("Position link") : ""}
+        ${note.linked_repair_id ? badgeHtml("Repair link") : ""}
+      </div>
       ${tagRowHtml(note.tags)}
       <div class="form-actions">
         <button class="button button-secondary button-tiny" type="button" data-tournament-action="edit" data-tournament-id="${note.id}">Edit</button>
@@ -1128,6 +1277,8 @@ function renderQuickIdeas() {
           <button class="button button-ghost button-tiny" type="button" data-idea-action="convert" data-idea-id="${idea.id}" data-convert-type="support_card">To card</button>
           <button class="button button-ghost button-tiny" type="button" data-idea-action="convert" data-idea-id="${idea.id}" data-convert-type="goal">To goal</button>
           <button class="button button-ghost button-tiny" type="button" data-idea-action="convert" data-idea-id="${idea.id}" data-convert-type="reminder">To reminder</button>
+          <button class="button button-ghost button-tiny" type="button" data-idea-action="convert" data-idea-id="${idea.id}" data-convert-type="position">To position</button>
+          <button class="button button-ghost button-tiny" type="button" data-idea-action="convert" data-idea-id="${idea.id}" data-convert-type="repair">To repair</button>
           <button class="button button-ghost button-tiny" type="button" data-idea-action="convert" data-idea-id="${idea.id}" data-convert-type="book">To book</button>
           <button class="button button-ghost button-tiny" type="button" data-idea-action="convert" data-idea-id="${idea.id}" data-convert-type="tournament_note">To event</button>
         ` : ""}
@@ -1170,14 +1321,28 @@ function paint() {
 }
 
 async function refresh() {
-  [supportCards, goals, appReminders, books, bookNotes, tournamentNotes, quickIdeas] = await Promise.all([
+  [
+    supportCards,
+    goals,
+    appReminders,
+    books,
+    bookNotes,
+    tournamentNotes,
+    quickIdeas,
+    linkedGames,
+    linkedPositions,
+    linkedRepairs
+  ] = await Promise.all([
     OpeningDB.loadSupportCards(),
     OpeningDB.loadGoals(),
     OpeningDB.loadAppReminders(),
     OpeningDB.loadBooks(),
     OpeningDB.loadBookNotes(),
     OpeningDB.loadTournamentNotes(),
-    OpeningDB.loadQuickIdeas()
+    OpeningDB.loadQuickIdeas(),
+    OpeningDB.loadGames(),
+    OpeningDB.loadPositions(),
+    OpeningDB.loadRepairItems()
   ]);
 
   if (selectedBookId && !bookById(selectedBookId)) {
@@ -1190,6 +1355,62 @@ async function refresh() {
 
   saveSelectedBook();
   paint();
+  applySupportFocus(consumeSupportFocus());
+}
+
+function applySupportFocus(focus) {
+  if (!focus?.pane) return;
+
+  setSupportPane(focus.pane, { scroll: true });
+
+  if (focus.type === "support_card" || focus.type === "card") {
+    fillSupportCardForm(supportCardById(focus.id));
+    scrollToForm("supportCardForm");
+    return;
+  }
+
+  if (focus.type === "goal") {
+    fillGoalForm(goalById(focus.id));
+    scrollToForm("goalForm");
+    return;
+  }
+
+  if (focus.type === "reminder") {
+    fillReminderForm(reminderById(focus.id));
+    scrollToForm("reminderForm");
+    return;
+  }
+
+  if (focus.type === "book") {
+    selectedBookId = focus.id;
+    saveSelectedBook();
+    fillBookForm(bookById(focus.id));
+    paint();
+    scrollToForm("bookForm");
+    return;
+  }
+
+  if (focus.type === "book_note") {
+    const note = bookNoteById(focus.id);
+    if (!note) return;
+    selectedBookId = note.book_id || selectedBookId;
+    saveSelectedBook();
+    paint();
+    fillBookNoteForm(note);
+    scrollToForm("bookNoteForm");
+    return;
+  }
+
+  if (focus.type === "tournament_note") {
+    fillTournamentForm(tournamentNoteById(focus.id));
+    scrollToForm("tournamentNoteForm");
+    return;
+  }
+
+  if (focus.type === "quick_idea") {
+    fillQuickIdeaForm(quickIdeaById(focus.id));
+    scrollToForm("quickIdeaForm");
+  }
 }
 
 async function handleReminderDone(reminder) {
@@ -1388,6 +1609,26 @@ async function convertIdea(idea, convertType) {
       tags: idea.tags,
       created_at: stamp,
       updated_at: stamp
+    });
+    convertedToId = created.id;
+  }
+
+  if (convertType === "position") {
+    const created = await createDraftPositionFromText({
+      title: idea.title,
+      body: idea.body,
+      tags: idea.tags,
+      sourceType: "random_study",
+      sourceLabel: "Quick idea conversion"
+    });
+    convertedToId = created.id;
+  }
+
+  if (convertType === "repair") {
+    const created = await createRepairFromText({
+      title: idea.title,
+      body: idea.body,
+      tags: idea.tags
     });
     convertedToId = created.id;
   }
@@ -1857,6 +2098,53 @@ $("bookNoteList")?.addEventListener("click", async event => {
       return;
     }
 
+    if (button.dataset.bookNoteAction === "position") {
+      const created = await createDraftPositionFromText({
+        title: note.title || "Book note position",
+        body: note.lesson || note.note,
+        tags: note.tags,
+        sourceType: "book",
+        sourceLabel: selectedBook()?.title || "Book note"
+      });
+      await OpeningDB.upsertBookNote({
+        ...note,
+        linked_position_id: created.id,
+        updated_at: nowIso()
+      });
+    }
+
+    if (button.dataset.bookNoteAction === "card") {
+      await OpeningDB.upsertSupportCard({
+        title: note.title || "Book note card",
+        body: note.lesson || note.note || note.action_item,
+        card_type: "note",
+        category: "study_process",
+        pinned: false,
+        priority: "normal",
+        tags: note.tags,
+        source: selectedBook()?.title || "Book note",
+        source_url: "",
+        status: "active",
+        created_at: nowIso(),
+        updated_at: nowIso(),
+        last_reviewed_at: null,
+        review_count: 0
+      });
+    }
+
+    if (button.dataset.bookNoteAction === "repair") {
+      const created = await createRepairFromText({
+        title: note.title || "Book note repair",
+        body: note.lesson || note.note || note.action_item,
+        tags: note.tags
+      });
+      await OpeningDB.upsertBookNote({
+        ...note,
+        linked_repair_id: created.id,
+        updated_at: nowIso()
+      });
+    }
+
     if (button.dataset.bookNoteAction === "delete") {
       if (!confirm(`Delete "${note.title || "this note"}"?`)) return;
       await OpeningDB.deleteBookNote(note.id);
@@ -1968,6 +2256,9 @@ $("tournamentNoteForm")?.addEventListener("submit", async event => {
       round_notes: $("tournamentRoundNotesInput").value.trim(),
       after_event_lessons: $("tournamentAfterLessonsInput").value.trim(),
       linked_goal_id: $("tournamentLinkedGoalInput").value || null,
+      linked_game_id: $("tournamentLinkedGameInput").value || null,
+      linked_position_id: $("tournamentLinkedPositionInput").value || null,
+      linked_repair_id: $("tournamentLinkedRepairInput").value || null,
       tags: parseTagsInput($("tournamentTagsInput").value),
       created_at: existing?.created_at || stamp,
       updated_at: stamp

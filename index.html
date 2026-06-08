@@ -90,6 +90,22 @@
     <section class="panel dashboard-panel">
       <div class="section-heading">
         <div>
+          <p class="eyebrow">Today's Mission</p>
+          <h3>What is the single best thing to do next?</h3>
+          <p class="muted">Repairs, positions, opening lines, unfinished games, and support items compete here so you do not have to guess.</p>
+        </div>
+
+        <div class="dashboard-focus">
+          <span id="dashboardMissionCount" class="status-pill">0 actions ready</span>
+        </div>
+      </div>
+
+      <div id="todayMissionList" class="dashboard-grid"></div>
+    </section>
+
+    <section class="panel dashboard-panel">
+      <div class="section-heading">
+        <div>
           <p class="eyebrow">Study dashboard</p>
           <h3>Choose your next rep</h3>
           <p class="muted">
@@ -221,7 +237,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
-  <script type="module" src="./js/app.js"></script>
+  <script type="module" src="./js/dashboard.js"></script>
   <script>
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js");
   </script>

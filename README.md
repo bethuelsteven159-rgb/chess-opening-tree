@@ -1,119 +1,146 @@
 # GM Opening Tree
 
-GM Opening Tree has grown into a private chess brain.
+GM Opening Tree is a local-first private chess brain.
 
-The app is owner-only, offline-friendly after login, and designed to keep:
+It is built to help one player:
 
-- opening theory
-- personal games
-- extracted positions
-- recurring mistakes
-- repair drills
-- goals and reminders
-- books and reading notes
-- mindset cards and tournament prep
+- store what they understand
+- capture lessons from games, books, and study
+- review what should stay in memory
+- repair recurring mistakes
+- keep support work like goals, reminders, and tournament prep connected to actual chess work
 
-inside one connected study system.
+The app stays usable offline after login, keeps guarded local copies before sync, and treats backup/export as a first-class safety feature.
 
-## Current Modules
+## Main Pages
 
 ### `index.html`
-Dashboard.
+Dashboard mission control.
 
-What it shows now:
+It now shows:
 
-- high-level counts for moves, games, positions, mistakes, repairs, and support work
-- the main study lanes
-- selected move focus
-- weakness heatmap from extracted mistake categories
-- unfinished game-analysis queue
-- Support Hub summary for due reminders, current books, active goals, and pinned cards
+- core counts
+- weakness heatmap
+- unfinished game queue
+- Support Hub summary
+- `Today's Mission` cards that point to the best next repair, position, opening line, game, or support action
 
 ### `editor.html`
-Move editor workspace.
+Move Editor.
 
-What it includes:
+It includes:
 
 - line explorer
 - move editor
 - live board
-- move explanations
-- preferred-move flags
-- do-not-train flags
-- import/export backup controls
+- preferred move flags
+- exclude-from-training flags
+- full backup export/import
+- board appearance control
+- global search / command palette
+
+The old `Split Moves` button has been removed from the UI.
 
 ### `games.html`
 Game Analysis Studio.
 
-What it includes:
+It includes:
 
 - PGN paste/import
-- PGN file import
-- board replay
-- move list replay navigation
-- move-by-move human notes
-- critical moment marker
-- create Position Vault entry from current move
-- create mistake record from current move
-- create repair card from current move
-- automatic opening-link attempt against the opening tree
+- replay board and move list
+- critical moment marking
+- human notes
+- position extraction
+- mistake extraction
+- repair creation
+- close-the-loop checklist
+- mark analysis complete
 
 ### `positions.html`
 Position Vault.
 
-What it includes:
+It now supports:
 
-- saved extracted positions
-- board view for stored FENs
-- human question / lesson editor
-- linked source game
-- linked opening
-- linked repair navigation
+- extracted game positions
+- manual positions from FEN
+- manual study cards from books, videos, websites, puzzles, or random study
+- source labels and URLs
+- review-enabled position cards
+
+Minimum reliable manual flow:
+
+1. Open `Positions`
+2. Fill `Manual position`
+3. Paste a FEN
+4. Add title, source, question, best move, lesson, tags
+5. Save
 
 ### `training.html`
-Board-first trainer.
+Universal review workspace.
 
-What it does:
+Modes:
 
-- choose color
-- choose root
-- hear the opponent reply
-- enter the repertoire move
-- reveal answer
-- reveal explanation
-- continue the line or jump to the next branch
+1. Opening Lines
+2. Positions
+3. Repairs
+4. Mixed Due Review
+
+Opening training now drills full root-to-leaf lines built from every leaf node in the opening tree.
 
 ### `repair.html`
 Repair loop workspace.
 
-What it does:
+It now supports:
 
-- stores mistake / lesson / repair
-- keeps repair items open until solved
-- anchors repairs to a move or path
-- accepts linked repair navigation from Position Vault
+- richer repair statuses
+- linked game / annotation / position / opening context
+- repair review scheduling
+- repair attempt history
 
 ### `support.html`
 Support Hub.
 
-What it includes:
+It is split into calmer workspace lanes instead of one long page:
 
-- support cards
-- goals board
-- in-app reminders
-- reading shelf
-- book notes
-- tournament notes
-- quick ideas inbox
-- quick capture
-- command-center summary for what matters now
+- Quick capture
+- Goals
+- Reminders
+- Books
+- Cards
+- Events
+- Ideas
 
-### `login.html`
-Owner-only Google login.
+Conversions now include:
+
+- book note -> position / support card / repair
+- quick idea -> goal / reminder / support card / position / repair
+- tournament note -> goal / game / position / repair links
+
+## Board Clarity
+
+Boards now use local SVG piece assets instead of Unicode as the main piece rendering.
+
+Piece sets:
+
+- `assets/pieces/classic/`
+- `assets/pieces/high-contrast/`
+
+Board appearance settings are stored in localStorage:
+
+- `gm_opening_tree_piece_style_v1`
+- `gm_opening_tree_board_contrast_v1`
+
+The shared board appearance control applies to:
+
+- Move Editor
+- Games
+- Positions
+- Training
+- Repair
 
 ## Data Model
 
-The app now uses these logical collections:
+Core collections:
 
 1. `opening_nodes`
 2. `repair_items`
@@ -128,177 +155,127 @@ The app now uses these logical collections:
 11. `book_notes`
 12. `tournament_notes`
 13. `quick_ideas`
+14. `review_items`
+15. `repair_attempts`
 
-All collections use the same protection pattern in `js/db.js`:
+`review_items` is the universal scheduling layer for:
+
+- opening lines
+- positions
+- repairs
+- optional future trainable notes
+
+## Backup And Safety
+
+The app keeps the same protection pattern across collections:
 
 - current local copy
-- non-empty recovery snapshot
+- recovery snapshot
 - pending-sync copy
 - guarded remote load
 - guarded remote save
-- refusal to wipe non-empty data with accidental empty payloads
+- refusal to wipe non-empty local data with empty remote payloads
 
-## Backup Behavior
+Full backup JSON now includes:
 
-The app now supports:
+- all study/support collections
+- `review_items`
+- `repair_attempts`
+- board appearance settings
 
-- full backup JSON: `gm-brain-full-backup.json`
-- table snapshots for:
-  - opening nodes
-  - repair items
-  - games
-  - game annotations
-  - positions
-  - mistakes
-  - support cards
-  - goals
-  - app reminders
-  - books
-  - book notes
-  - tournament notes
-  - quick ideas
+The importer accepts:
 
-### Entry Safety Prompt
+- old node-only backups
+- older combined backups
+- table snapshots
+- older full backups with missing collections
+- the current full backup format
 
-When a protected page loads, the app prompts once per session to export:
-
-- one full restore backup
-- all current table snapshots
-
-The prompt now includes summary counts for:
-
-- opening nodes
-- repairs
-- games
-- positions
-- support cards
-- active goals
-- reminders
-- books
+Missing collections are handled safely.
 
 ## Offline Behavior
 
-If you already have a valid session and do not log out, the installed app can keep working offline.
+After login/session is available, the app can keep working offline for normal study work.
 
-What works offline now:
+Offline-safe flows include:
 
 - move editing
-- training
-- repair editing
-- game import and local analysis
-- position-vault editing
-- Support Hub editing
+- manual position creation
+- game analysis
+- review grading
+- repair updates
+- Support Hub updates
 - backup export
 
-What waits for later:
+When sync fails, the app keeps the local copy and preserves pending changes for a later sync.
 
-- remote Supabase sync
+## Required Supabase Step
 
-When sync fails:
-
-- the local copy is kept
-- the recovery snapshot is kept
-- pending changes are preserved for the next sync
-
-## Required SQL Step
-
-After pulling this build, run:
+Run:
 
 - `supabase/schema.sql`
 
-in the Supabase SQL Editor.
+in the Supabase SQL Editor after pulling this build.
 
-This adds or upgrades:
+This script safely:
 
-- `games`
-- `game_annotations`
-- `positions`
-- `mistakes`
-- `support_cards`
-- `goals`
-- `app_reminders`
-- `books`
-- `book_notes`
-- `tournament_notes`
-- `quick_ideas`
+- adds new position / repair / game / support columns
+- creates `review_items`
+- creates `repair_attempts`
+- adds new tournament links
+- keeps existing data intact
 
-If you skip this step, the app still works locally, but the new modules remain local-only until the tables exist remotely.
+If you do not run the SQL yet, the app still works locally. New remote sync for the new tables simply waits until those tables exist.
 
-## Import Behavior
+## Important Files
 
-The importer on `editor.html` now understands:
+- `js/ui-shell.js`
+  Shared page chrome, theme, board appearance, and global search
 
-- old node-only arrays
-- old combined node/repair backups
-- single-table snapshots
-- older six-collection full backups
-- the new full-backup format with all support collections
+- `js/board-tools.js`
+  Chess board rendering, PGN helpers, move matching, and SVG piece rendering
 
-Missing support arrays default safely to empty lists.
+- `js/review-utils.js`
+  Leaf-line extraction and review scheduling helpers
 
-## Typical Flow
+- `js/navigation-state.js`
+  Shared local navigation/selection state between pages
 
-### Opening work
+- `js/dashboard.js`
+  Dashboard mission control logic
 
-1. Build or edit moves in `editor.html`
-2. Train them in `training.html`
-3. Store recurring leaks in `repair.html`
-
-### Personal game work
-
-1. Import PGN in `games.html`
-2. Replay the game manually
-3. Mark critical moments
-4. Save move-by-move notes
-5. Extract a position
-6. Extract a mistake
-7. Create a repair
-8. Review the extracted position later in `positions.html`
-
-### Support work
-
-1. Store goals and reminders in `support.html`
-2. Keep current books and extraction notes in the reading shelf
-3. Pin mindset or anti-tilt cards
-4. Capture loose ideas before organizing them
-5. Keep tournament prep and reflection away from raw game analysis
-
-## Files To Know
-
-- `js/app.js`
-  Dashboard/editor/training/repair logic plus backup prompt and import/export handling
+- `js/training.js`
+  Universal review logic
 
 - `js/games.js`
-  Game Analysis Studio logic
+  Game analysis logic
 
 - `js/positions.js`
   Position Vault logic
 
+- `js/repair.js`
+  Repair workspace logic
+
 - `js/support.js`
-  Support Hub logic
-
-- `js/support-utils.js`
-  Shared support-date, repeat-rule, and progress helpers
-
-- `js/chess-brain-utils.js`
-  Shared helpers for PGN parsing, boards, downloads, and toast UI
+  Support Hub logic and conversions
 
 - `js/db.js`
-  Local-first + Supabase sync layer for all collections
+  Local-first data layer and guarded Supabase sync
 
 - `supabase/schema.sql`
-  Required migration script for the current tables
+  Safe schema/migration script
 
-- `CURRENT_APP_STATE.txt`
-  Practical snapshot of what the app currently does right now
+- `service-worker.js`
+  Offline asset cache, including the SVG piece sets
 
-## Product Shape Now
+## Product Shape
 
-The app now feels like:
+The final shape is:
 
-- Editor = build the lines
+- Dashboard = what to do next
+- Editor = build the repertoire
 - Games = understand real games
-- Positions = save important boards
-- Training = test recall
-- Repair = fix leaks
-- Support = hold the goals, books, reminders, principles, and reset cards that keep the journey alive
+- Positions = keep important board states
+- Training = review what must be remembered
+- Repair = fix repeating leaks
+- Support = keep the bigger mission connected to the chess work

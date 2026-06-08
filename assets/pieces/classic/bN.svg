@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" role="img" aria-labelledby="title desc">
+  <title>bN chess piece</title>
+  <desc>Chess piece token with the letter N.</desc>
+  <circle cx="40" cy="40" r="33" fill="#162133" stroke="#fff3cf" stroke-width="4" />
+  <circle cx="40" cy="40" r="28" fill="none" stroke="#5fc0ac" stroke-width="3" opacity="0.95" />
+  <path d="M22 55h36" stroke="#fff3cf" stroke-width="3.6" stroke-linecap="round" opacity="0.65" />
+  <text x="40" y="48" text-anchor="middle" font-family="Manrope, Arial, sans-serif" font-size="31" font-weight="800" fill="#fff3cf">N</text>
+</svg>

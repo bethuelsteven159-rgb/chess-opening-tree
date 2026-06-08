@@ -6,9 +6,13 @@ import {
   colorToMoveText,
   createChessGame,
   moveTextMatches,
-  renderBoardSquares,
-  splitMoveParts
+  renderBoardSquares
 } from "./board-tools.js";
+import {
+  applyBoardAppearance,
+  boardAppearanceSummary,
+  getStoredBoardAppearance
+} from "./board-appearance.js";
 import {
   isReminderDue,
   supportCommandItems
@@ -39,6 +43,8 @@ let books = [];
 let bookNotes = [];
 let tournamentNotes = [];
 let quickIdeas = [];
+let reviewItems = [];
+let repairAttempts = [];
 let selectedId = loadSelectedNodeId();
 let selectedRepairId = loadSelectedRepairId();
 let trainingState = {
@@ -1495,7 +1501,23 @@ function paint() {
 }
 
 async function refresh() {
-  [nodes, repairs, games, gameAnnotations, positions, mistakes, supportCards, goals, appReminders, books, bookNotes, tournamentNotes, quickIdeas] = await Promise.all([
+  [
+    nodes,
+    repairs,
+    games,
+    gameAnnotations,
+    positions,
+    mistakes,
+    supportCards,
+    goals,
+    appReminders,
+    books,
+    bookNotes,
+    tournamentNotes,
+    quickIdeas,
+    reviewItems,
+    repairAttempts
+  ] = await Promise.all([
     OpeningDB.loadNodes(),
     OpeningDB.loadRepairItems(),
     OpeningDB.loadGames(),
@@ -1508,7 +1530,9 @@ async function refresh() {
     OpeningDB.loadBooks(),
     OpeningDB.loadBookNotes(),
     OpeningDB.loadTournamentNotes(),
-    OpeningDB.loadQuickIdeas()
+    OpeningDB.loadQuickIdeas(),
+    OpeningDB.loadReviewItems ? OpeningDB.loadReviewItems() : Promise.resolve([]),
+    OpeningDB.loadRepairAttempts ? OpeningDB.loadRepairAttempts() : Promise.resolve([])
   ]);
 
   if (selectedId && !nodeById(selectedId)) {
@@ -1540,7 +1564,7 @@ async function refresh() {
 
 function backupPayload() {
   return {
-    version: 7,
+    version: 8,
     exported_at: new Date().toISOString(),
     nodes,
     repairs,
@@ -1554,7 +1578,10 @@ function backupPayload() {
     books,
     book_notes: bookNotes,
     tournament_notes: tournamentNotes,
-    quick_ideas: quickIdeas
+    quick_ideas: quickIdeas,
+    review_items: reviewItems,
+    repair_attempts: repairAttempts,
+    board_settings: getStoredBoardAppearance()
   };
 }
 
@@ -1675,6 +1702,24 @@ function quickIdeasPayload() {
   };
 }
 
+function reviewItemsPayload() {
+  return {
+    table: window.APP_CONFIG?.REVIEW_ITEMS_TABLE_NAME || "review_items",
+    exported_at: new Date().toISOString(),
+    count: reviewItems.length,
+    rows: reviewItems
+  };
+}
+
+function repairAttemptsPayload() {
+  return {
+    table: window.APP_CONFIG?.REPAIR_ATTEMPTS_TABLE_NAME || "repair_attempts",
+    exported_at: new Date().toISOString(),
+    count: repairAttempts.length,
+    rows: repairAttempts
+  };
+}
+
 function exportOpeningNodesJson() {
   downloadJsonFile("gm-opening-tree-opening-nodes.json", openingNodesPayload());
   showToast("Opening nodes exported.");
@@ -1740,6 +1785,16 @@ function exportQuickIdeasJson() {
   showToast("Quick ideas exported.");
 }
 
+function exportReviewItemsJson() {
+  downloadJsonFile("gm-brain-review-items.json", reviewItemsPayload());
+  showToast("Review items exported.");
+}
+
+function exportRepairAttemptsJson() {
+  downloadJsonFile("gm-brain-repair-attempts.json", repairAttemptsPayload());
+  showToast("Repair attempts exported.");
+}
+
 function exportFullBackupJson() {
   downloadJsonFile("gm-brain-full-backup.json", backupPayload());
   showToast("Full backup exported.");
@@ -1760,11 +1815,37 @@ function exportAllSafetyBackups() {
     exportBooksJson,
     exportBookNotesJson,
     exportTournamentNotesJson,
-    exportQuickIdeasJson
+    exportQuickIdeasJson,
+    exportReviewItemsJson,
+    exportRepairAttemptsJson
   ];
 
   tasks.forEach((task, index) => {
     window.setTimeout(task, index * 140);
+  });
+}
+
+function exportAllTableSnapshots() {
+  const tasks = [
+    exportOpeningNodesJson,
+    exportRepairItemsJson,
+    exportGamesJson,
+    exportGameAnnotationsJson,
+    exportPositionsJson,
+    exportMistakesJson,
+    exportSupportCardsJson,
+    exportGoalsJson,
+    exportAppRemindersJson,
+    exportBooksJson,
+    exportBookNotesJson,
+    exportTournamentNotesJson,
+    exportQuickIdeasJson,
+    exportReviewItemsJson,
+    exportRepairAttemptsJson
+  ];
+
+  tasks.forEach((task, index) => {
+    window.setTimeout(task, index * 120);
   });
 }
 
@@ -1780,7 +1861,7 @@ function ensureBackupPrompt() {
       <p class="eyebrow">Safety export</p>
       <h3 id="backupPromptTitle">Download your full backup before you work.</h3>
       <p class="muted">
-        This quick safety step exports one full JSON restore file plus the current table snapshots for moves, repairs, games, annotations, positions, mistakes, and the Support Hub collections.
+        This quick safety step exports one full JSON restore file plus the current table snapshots for moves, repairs, games, annotations, positions, reviews, repair attempts, and the Support Hub collections.
       </p>
       <div class="backup-prompt-meta">
         <span id="backupPromptNodeCount" class="status-pill">0 opening nodes</span>
@@ -1808,21 +1889,7 @@ function ensureBackupPrompt() {
     hideBackupPrompt();
   });
   $("backupExportFullBtn")?.addEventListener("click", exportFullBackupJson);
-  $("backupExportTablesBtn")?.addEventListener("click", () => {
-    exportOpeningNodesJson();
-    window.setTimeout(() => exportRepairItemsJson(), 120);
-    window.setTimeout(() => exportGamesJson(), 240);
-    window.setTimeout(() => exportGameAnnotationsJson(), 360);
-    window.setTimeout(() => exportPositionsJson(), 480);
-    window.setTimeout(() => exportMistakesJson(), 600);
-    window.setTimeout(() => exportSupportCardsJson(), 720);
-    window.setTimeout(() => exportGoalsJson(), 840);
-    window.setTimeout(() => exportAppRemindersJson(), 960);
-    window.setTimeout(() => exportBooksJson(), 1080);
-    window.setTimeout(() => exportBookNotesJson(), 1200);
-    window.setTimeout(() => exportTournamentNotesJson(), 1320);
-    window.setTimeout(() => exportQuickIdeasJson(), 1440);
-  });
+  $("backupExportTablesBtn")?.addEventListener("click", exportAllTableSnapshots);
   $("backupDismissBtn")?.addEventListener("click", hideBackupPrompt);
   dialog.addEventListener("click", event => {
     if (event.target === dialog) hideBackupPrompt();
@@ -1871,7 +1938,10 @@ function parseImportedBackup(text) {
       books,
       bookNotes,
       tournamentNotes,
-      quickIdeas
+      quickIdeas,
+      reviewItems,
+      repairAttempts,
+      boardSettings: getStoredBoardAppearance()
     };
   }
 
@@ -1893,7 +1963,10 @@ function parseImportedBackup(text) {
       books,
       bookNotes,
       tournamentNotes,
-      quickIdeas
+      quickIdeas,
+      reviewItems,
+      repairAttempts,
+      boardSettings: getStoredBoardAppearance()
     };
   }
 
@@ -1911,7 +1984,10 @@ function parseImportedBackup(text) {
       books,
       bookNotes,
       tournamentNotes,
-      quickIdeas
+      quickIdeas,
+      reviewItems,
+      repairAttempts,
+      boardSettings: getStoredBoardAppearance()
     };
   }
 
@@ -1929,7 +2005,10 @@ function parseImportedBackup(text) {
       books,
       bookNotes,
       tournamentNotes,
-      quickIdeas
+      quickIdeas,
+      reviewItems,
+      repairAttempts,
+      boardSettings: getStoredBoardAppearance()
     };
   }
 
@@ -1947,7 +2026,10 @@ function parseImportedBackup(text) {
       books,
       bookNotes,
       tournamentNotes,
-      quickIdeas
+      quickIdeas,
+      reviewItems,
+      repairAttempts,
+      boardSettings: getStoredBoardAppearance()
     };
   }
 
@@ -1965,7 +2047,10 @@ function parseImportedBackup(text) {
       books,
       bookNotes,
       tournamentNotes,
-      quickIdeas
+      quickIdeas,
+      reviewItems,
+      repairAttempts,
+      boardSettings: getStoredBoardAppearance()
     };
   }
 
@@ -1983,7 +2068,10 @@ function parseImportedBackup(text) {
       books,
       bookNotes,
       tournamentNotes,
-      quickIdeas
+      quickIdeas,
+      reviewItems,
+      repairAttempts,
+      boardSettings: getStoredBoardAppearance()
     };
   }
 
@@ -2001,7 +2089,10 @@ function parseImportedBackup(text) {
       books,
       bookNotes,
       tournamentNotes,
-      quickIdeas
+      quickIdeas,
+      reviewItems,
+      repairAttempts,
+      boardSettings: getStoredBoardAppearance()
     };
   }
 
@@ -2019,7 +2110,10 @@ function parseImportedBackup(text) {
       books,
       bookNotes,
       tournamentNotes,
-      quickIdeas
+      quickIdeas,
+      reviewItems,
+      repairAttempts,
+      boardSettings: getStoredBoardAppearance()
     };
   }
 
@@ -2037,7 +2131,10 @@ function parseImportedBackup(text) {
       books,
       bookNotes,
       tournamentNotes,
-      quickIdeas
+      quickIdeas,
+      reviewItems,
+      repairAttempts,
+      boardSettings: getStoredBoardAppearance()
     };
   }
 
@@ -2055,7 +2152,10 @@ function parseImportedBackup(text) {
       books: parsed.rows.map(OpeningDB.normalizeBook),
       bookNotes,
       tournamentNotes,
-      quickIdeas
+      quickIdeas,
+      reviewItems,
+      repairAttempts,
+      boardSettings: getStoredBoardAppearance()
     };
   }
 
@@ -2073,7 +2173,10 @@ function parseImportedBackup(text) {
       books,
       bookNotes: parsed.rows.map(OpeningDB.normalizeBookNote),
       tournamentNotes,
-      quickIdeas
+      quickIdeas,
+      reviewItems,
+      repairAttempts,
+      boardSettings: getStoredBoardAppearance()
     };
   }
 
@@ -2091,7 +2194,10 @@ function parseImportedBackup(text) {
       books,
       bookNotes,
       tournamentNotes: parsed.rows.map(OpeningDB.normalizeTournamentNote),
-      quickIdeas
+      quickIdeas,
+      reviewItems,
+      repairAttempts,
+      boardSettings: getStoredBoardAppearance()
     };
   }
 
@@ -2109,7 +2215,52 @@ function parseImportedBackup(text) {
       books,
       bookNotes,
       tournamentNotes,
-      quickIdeas: parsed.rows.map(OpeningDB.normalizeQuickIdea)
+      quickIdeas: parsed.rows.map(OpeningDB.normalizeQuickIdea),
+      reviewItems,
+      repairAttempts,
+      boardSettings: getStoredBoardAppearance()
+    };
+  }
+
+  if (parsed.table === (window.APP_CONFIG?.REVIEW_ITEMS_TABLE_NAME || "review_items") && Array.isArray(parsed.rows)) {
+    return {
+      nodes,
+      repairs,
+      games,
+      gameAnnotations,
+      positions,
+      mistakes,
+      supportCards,
+      goals,
+      appReminders,
+      books,
+      bookNotes,
+      tournamentNotes,
+      quickIdeas,
+      reviewItems: parsed.rows.map(OpeningDB.normalizeReviewItem),
+      repairAttempts,
+      boardSettings: getStoredBoardAppearance()
+    };
+  }
+
+  if (parsed.table === (window.APP_CONFIG?.REPAIR_ATTEMPTS_TABLE_NAME || "repair_attempts") && Array.isArray(parsed.rows)) {
+    return {
+      nodes,
+      repairs,
+      games,
+      gameAnnotations,
+      positions,
+      mistakes,
+      supportCards,
+      goals,
+      appReminders,
+      books,
+      bookNotes,
+      tournamentNotes,
+      quickIdeas,
+      reviewItems,
+      repairAttempts: parsed.rows.map(OpeningDB.normalizeRepairAttempt),
+      boardSettings: getStoredBoardAppearance()
     };
   }
 
@@ -2140,8 +2291,23 @@ function parseImportedBackup(text) {
     tournamentNotes: Array.isArray(parsed.tournament_notes)
       ? parsed.tournament_notes.map(OpeningDB.normalizeTournamentNote)
       : tournamentNotes,
-    quickIdeas: Array.isArray(parsed.quick_ideas) ? parsed.quick_ideas.map(OpeningDB.normalizeQuickIdea) : quickIdeas
+    quickIdeas: Array.isArray(parsed.quick_ideas) ? parsed.quick_ideas.map(OpeningDB.normalizeQuickIdea) : quickIdeas,
+    reviewItems: Array.isArray(parsed.review_items) ? parsed.review_items.map(OpeningDB.normalizeReviewItem) : reviewItems,
+    repairAttempts: Array.isArray(parsed.repair_attempts)
+      ? parsed.repair_attempts.map(OpeningDB.normalizeRepairAttempt)
+      : repairAttempts,
+    boardSettings: parsed.board_settings && typeof parsed.board_settings === "object"
+      ? parsed.board_settings
+      : getStoredBoardAppearance()
   };
+}
+
+function applyImportedBoardSettings(settings) {
+  const resolved = applyBoardAppearance(settings || getStoredBoardAppearance());
+  const boardAppearanceBtn = $("boardAppearanceBtn");
+  if (boardAppearanceBtn) {
+    boardAppearanceBtn.textContent = boardAppearanceSummary(resolved);
+  }
 }
 
 const dashboardGameQueue = $("dashboardGameQueue");
@@ -2387,17 +2553,6 @@ if (syncBtn) {
   });
 }
 
-const splitCompoundBtn = $("splitCompoundBtn");
-if (splitCompoundBtn) {
-  splitCompoundBtn.addEventListener("click", async () => {
-    try {
-      await splitCompoundMovesOnce();
-    } catch (error) {
-      reportActionError("Splitting compound moves", error);
-    }
-  });
-}
-
 const trainerColorWhiteBtn = $("trainerColorWhiteBtn");
 if (trainerColorWhiteBtn) {
   trainerColorWhiteBtn.addEventListener("click", () => switchTrainingColor("w"));
@@ -2518,6 +2673,9 @@ if (importBtn && importInput) {
       await OpeningDB.saveAllBookNotes(imported.bookNotes, { allowEmpty: true });
       await OpeningDB.saveAllTournamentNotes(imported.tournamentNotes, { allowEmpty: true });
       await OpeningDB.saveAllQuickIdeas(imported.quickIdeas, { allowEmpty: true });
+      await OpeningDB.saveAllReviewItems(imported.reviewItems, { allowEmpty: true });
+      await OpeningDB.saveAllRepairAttempts(imported.repairAttempts, { allowEmpty: true });
+      applyImportedBoardSettings(imported.boardSettings);
       setSelectedNodeId(null);
       setSelectedRepairId(null);
       trainingState.prompt = null;

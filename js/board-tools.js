@@ -1,3 +1,5 @@
+import { pieceAssetPath, pieceLabel } from "./board-appearance.js";
+
 export const BOARD_FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 export const BOARD_RANKS = [8, 7, 6, 5, 4, 3, 2, 1];
 export const STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
@@ -190,8 +192,7 @@ export function colorToMoveText(turn) {
 
 function squareLabel(file, rank, piece) {
   if (!piece) return `${file}${rank} empty`;
-  const color = piece.color === "w" ? "White" : "Black";
-  return `${file}${rank} ${color} ${PIECE_NAMES[piece.type] || "piece"}`;
+  return `${file}${rank} ${pieceLabel(piece)}`;
 }
 
 export function renderBoardSquares(rows, lastMove) {
@@ -213,7 +214,20 @@ export function renderBoardSquares(rows, lastMove) {
       ].filter(Boolean).join(" ");
 
       const pieceHtml = piece
-        ? `<span class="piece ${piece.color === "w" ? "white" : "black"}">${PIECE_SYMBOLS[piece.color][piece.type]}</span>`
+        ? `
+          <span class="piece-wrap ${piece.color === "w" ? "white" : "black"}">
+            <img
+              class="piece-img"
+              src="${pieceAssetPath(piece)}"
+              alt="${pieceLabel(piece)}"
+              loading="eager"
+              decoding="sync"
+              data-piece-color="${piece.color}"
+              data-piece-type="${piece.type}"
+              onerror="this.classList.add('is-broken')"
+            />
+            <span class="piece-fallback piece ${piece.color === "w" ? "white" : "black"}" aria-hidden="true">${PIECE_SYMBOLS[piece.color][piece.type]}</span>
+          </span>`
         : "";
 
       return `
