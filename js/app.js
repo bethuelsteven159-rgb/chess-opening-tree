@@ -45,6 +45,7 @@ let tournamentNotes = [];
 let quickIdeas = [];
 let reviewItems = [];
 let repairAttempts = [];
+let treeMutationBusy = false;
 let selectedId = loadSelectedNodeId();
 let selectedRepairId = loadSelectedRepairId();
 let trainingState = {
@@ -198,6 +199,23 @@ function currentNode() {
 
 function children(parentId) {
   return nodes.filter(node => node.parent_id === parentId);
+}
+
+function childBranchIds(nodeId, sourceNodes = nodes) {
+  const ids = new Set();
+
+  function visit(parentId) {
+    sourceNodes
+      .filter(node => node.parent_id === parentId)
+      .forEach(node => {
+        if (ids.has(node.id)) return;
+        ids.add(node.id);
+        visit(node.id);
+      });
+  }
+
+  visit(nodeId);
+  return ids;
 }
 
 function childCount(nodeId) {
@@ -601,6 +619,34 @@ function resetEditorForNewRoot() {
   setSelectedRepairId(null);
   populateEditor(null, { newRoot: true });
   paint();
+}
+
+function applyLocalNodeState(nextNodes, nextSelectedId = selectedId) {
+  nodes = nextNodes.map(OpeningDB.normalizeNode);
+
+  if (nextSelectedId && !nodes.some(node => node.id === nextSelectedId)) {
+    nextSelectedId = null;
+  }
+
+  setSelectedNodeId(nextSelectedId || null);
+
+  if ($("moveInput")) {
+    if (selectedId) populateEditor(nodeById(selectedId));
+    else populateEditor(null);
+  }
+
+  paint();
+}
+
+async function runTreeMutation(actionLabel, run) {
+  if (treeMutationBusy) return;
+  treeMutationBusy = true;
+
+  try {
+    await run();
+  } finally {
+    treeMutationBusy = false;
+  }
 }
 
 function getFormNode(parentId = null, existingId = null) {
@@ -2327,17 +2373,25 @@ if (moveForm) {
   moveForm.addEventListener("submit", async event => {
     event.preventDefault();
 
-    try {
+    await runTreeMutation("Saving move", async () => {
       const existing = nodeById(selectedId);
       const node = getFormNode(existing?.parent_id || null, selectedId || null);
-      await OpeningDB.upsertNode(node);
-      setSelectedNodeId(node.id);
+      const previousNodes = [...nodes];
+      const previousSelectedId = selectedId;
+      const nextNodes = previousNodes.some(entry => entry.id === node.id)
+        ? previousNodes.map(entry => entry.id === node.id ? node : entry)
+        : [...previousNodes, node];
 
-      await refresh();
-      showToast(navigator.onLine ? "Move saved." : "Move saved locally.");
-    } catch (error) {
-      reportActionError("Saving move", error);
-    }
+      applyLocalNodeState(nextNodes, node.id);
+
+      try {
+        await OpeningDB.saveAllNodes(nextNodes);
+        showToast(navigator.onLine ? "Move saved." : "Move saved locally.");
+      } catch (error) {
+        applyLocalNodeState(previousNodes, previousSelectedId);
+        reportActionError("Saving move", error);
+      }
+    });
   });
 }
 
@@ -2497,7 +2551,7 @@ if (addChildBtn) {
   addChildBtn.addEventListener("click", async () => {
     if (!selectedId) return;
 
-    try {
+    await runTreeMutation("Adding child move", async () => {
       const child = {
         id: crypto.randomUUID(),
         parent_id: selectedId,
@@ -2511,15 +2565,20 @@ if (addChildBtn) {
         is_preferred: false,
         created_at: new Date().toISOString()
       };
+      const previousNodes = [...nodes];
+      const parentId = selectedId;
+      const nextNodes = [...previousNodes, child];
 
-      await OpeningDB.upsertNode(child);
-      setSelectedNodeId(child.id);
+      applyLocalNodeState(nextNodes, parentId);
 
-      await refresh();
-      showToast(navigator.onLine ? "Child move added." : "Child move added locally.");
-    } catch (error) {
-      reportActionError("Adding child move", error);
-    }
+      try {
+        await OpeningDB.saveAllNodes(nextNodes);
+        showToast(navigator.onLine ? "Child move added." : "Child move added locally.");
+      } catch (error) {
+        applyLocalNodeState(previousNodes, parentId);
+        reportActionError("Adding child move", error);
+      }
+    });
   });
 }
 
@@ -2528,16 +2587,25 @@ if (deleteBtn) {
   deleteBtn.addEventListener("click", async () => {
     if (!selectedId || !confirm("Delete this move and all child lines?")) return;
 
-    try {
+    await runTreeMutation("Deleting move", async () => {
       const deletedNode = nodeById(selectedId);
-      setSelectedNodeId(deletedNode?.parent_id || null);
-      await OpeningDB.deleteNodeAndChildren(deletedNode.id);
+      const previousNodes = [...nodes];
+      const previousSelectedId = selectedId;
+      const removeIds = childBranchIds(deletedNode.id, previousNodes);
+      removeIds.add(deletedNode.id);
+      const nextNodes = previousNodes.filter(node => !removeIds.has(node.id));
+      const nextSelectedId = deletedNode?.parent_id || null;
 
-      await refresh();
-      showToast("Move deleted.");
-    } catch (error) {
-      reportActionError("Deleting move", error);
-    }
+      applyLocalNodeState(nextNodes, nextSelectedId);
+
+      try {
+        await OpeningDB.deleteNodeAndChildren(deletedNode.id);
+        showToast("Move deleted.");
+      } catch (error) {
+        applyLocalNodeState(previousNodes, previousSelectedId);
+        reportActionError("Deleting move", error);
+      }
+    });
   });
 }
 
@@ -2545,10 +2613,11 @@ const syncBtn = $("syncBtn");
 if (syncBtn) {
   syncBtn.addEventListener("click", async () => {
     try {
+      await OpeningDB.commitAllChanges?.();
       await refresh();
-      showToast(navigator.onLine ? "Workspace synced." : "Offline mode active. Using your local copy.");
+      showToast(navigator.onLine ? "Changes committed." : "Offline mode active. Your changes are stored locally.");
     } catch (error) {
-      reportActionError("Syncing data", error);
+      reportActionError("Committing changes", error);
     }
   });
 }
@@ -2657,40 +2726,99 @@ if (importBtn && importInput) {
     const file = event.target.files[0];
     if (!file) return;
 
-    try {
-      const text = await file.text();
-      const imported = parseImportedBackup(text);
-      await OpeningDB.saveAllNodes(imported.nodes);
-      await OpeningDB.saveAllRepairItems(imported.repairs);
-      await OpeningDB.saveAllGames(imported.games, { allowEmpty: true });
-      await OpeningDB.saveAllGameAnnotations(imported.gameAnnotations, { allowEmpty: true });
-      await OpeningDB.saveAllPositions(imported.positions, { allowEmpty: true });
-      await OpeningDB.saveAllMistakes(imported.mistakes, { allowEmpty: true });
-      await OpeningDB.saveAllSupportCards(imported.supportCards, { allowEmpty: true });
-      await OpeningDB.saveAllGoals(imported.goals, { allowEmpty: true });
-      await OpeningDB.saveAllAppReminders(imported.appReminders, { allowEmpty: true });
-      await OpeningDB.saveAllBooks(imported.books, { allowEmpty: true });
-      await OpeningDB.saveAllBookNotes(imported.bookNotes, { allowEmpty: true });
-      await OpeningDB.saveAllTournamentNotes(imported.tournamentNotes, { allowEmpty: true });
-      await OpeningDB.saveAllQuickIdeas(imported.quickIdeas, { allowEmpty: true });
-      await OpeningDB.saveAllReviewItems(imported.reviewItems, { allowEmpty: true });
-      await OpeningDB.saveAllRepairAttempts(imported.repairAttempts, { allowEmpty: true });
-      applyImportedBoardSettings(imported.boardSettings);
-      setSelectedNodeId(null);
-      setSelectedRepairId(null);
-      trainingState.prompt = null;
-      trainingState.result = null;
-      trainingState.revealOpen = false;
-      trainingState.whyOpen = false;
-      trainingState.lastOpponentNodeId = null;
-      await refresh();
-      showToast("Backup imported.");
-    } catch (error) {
-      console.error("Import failed:", error);
-      alert(`Import failed: ${error.message}`);
-    } finally {
-      event.target.value = "";
-    }
+    await runTreeMutation("Importing backup", async () => {
+      const previousSnapshot = {
+        nodes: [...nodes],
+        repairs: [...repairs],
+        games: [...games],
+        gameAnnotations: [...gameAnnotations],
+        positions: [...positions],
+        mistakes: [...mistakes],
+        supportCards: [...supportCards],
+        goals: [...goals],
+        appReminders: [...appReminders],
+        books: [...books],
+        bookNotes: [...bookNotes],
+        tournamentNotes: [...tournamentNotes],
+        quickIdeas: [...quickIdeas],
+        reviewItems: [...reviewItems],
+        repairAttempts: [...repairAttempts],
+        selectedId,
+        selectedRepairId
+      };
+
+      try {
+        const text = await file.text();
+        const imported = parseImportedBackup(text);
+
+        nodes = imported.nodes;
+        repairs = imported.repairs;
+        games = imported.games;
+        gameAnnotations = imported.gameAnnotations;
+        positions = imported.positions;
+        mistakes = imported.mistakes;
+        supportCards = imported.supportCards;
+        goals = imported.goals;
+        appReminders = imported.appReminders;
+        books = imported.books;
+        bookNotes = imported.bookNotes;
+        tournamentNotes = imported.tournamentNotes;
+        quickIdeas = imported.quickIdeas;
+        reviewItems = imported.reviewItems;
+        repairAttempts = imported.repairAttempts;
+        setSelectedNodeId(null);
+        setSelectedRepairId(null);
+        trainingState.prompt = null;
+        trainingState.result = null;
+        trainingState.revealOpen = false;
+        trainingState.whyOpen = false;
+        trainingState.lastOpponentNodeId = null;
+        applyImportedBoardSettings(imported.boardSettings);
+        populateEditor(null);
+        paint();
+
+        await OpeningDB.saveAllNodes(imported.nodes, { allowEmpty: true });
+        await OpeningDB.saveAllRepairItems(imported.repairs, { allowEmpty: true });
+        await OpeningDB.saveAllGames(imported.games, { allowEmpty: true });
+        await OpeningDB.saveAllGameAnnotations(imported.gameAnnotations, { allowEmpty: true });
+        await OpeningDB.saveAllPositions(imported.positions, { allowEmpty: true });
+        await OpeningDB.saveAllMistakes(imported.mistakes, { allowEmpty: true });
+        await OpeningDB.saveAllSupportCards(imported.supportCards, { allowEmpty: true });
+        await OpeningDB.saveAllGoals(imported.goals, { allowEmpty: true });
+        await OpeningDB.saveAllAppReminders(imported.appReminders, { allowEmpty: true });
+        await OpeningDB.saveAllBooks(imported.books, { allowEmpty: true });
+        await OpeningDB.saveAllBookNotes(imported.bookNotes, { allowEmpty: true });
+        await OpeningDB.saveAllTournamentNotes(imported.tournamentNotes, { allowEmpty: true });
+        await OpeningDB.saveAllQuickIdeas(imported.quickIdeas, { allowEmpty: true });
+        await OpeningDB.saveAllReviewItems(imported.reviewItems, { allowEmpty: true });
+        await OpeningDB.saveAllRepairAttempts(imported.repairAttempts, { allowEmpty: true });
+        showToast("Backup imported.");
+      } catch (error) {
+        nodes = previousSnapshot.nodes;
+        repairs = previousSnapshot.repairs;
+        games = previousSnapshot.games;
+        gameAnnotations = previousSnapshot.gameAnnotations;
+        positions = previousSnapshot.positions;
+        mistakes = previousSnapshot.mistakes;
+        supportCards = previousSnapshot.supportCards;
+        goals = previousSnapshot.goals;
+        appReminders = previousSnapshot.appReminders;
+        books = previousSnapshot.books;
+        bookNotes = previousSnapshot.bookNotes;
+        tournamentNotes = previousSnapshot.tournamentNotes;
+        quickIdeas = previousSnapshot.quickIdeas;
+        reviewItems = previousSnapshot.reviewItems;
+        repairAttempts = previousSnapshot.repairAttempts;
+        setSelectedNodeId(previousSnapshot.selectedId);
+        setSelectedRepairId(previousSnapshot.selectedRepairId);
+        populateEditor(nodeById(selectedId));
+        paint();
+        console.error("Import failed:", error);
+        alert(`Import failed: ${error.message}`);
+      } finally {
+        event.target.value = "";
+      }
+    });
   });
 }
 

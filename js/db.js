@@ -1049,6 +1049,26 @@ function isMissingTableError(error, tableName) {
   return text.includes(tableName.toLowerCase()) || text.includes("does not exist") || text.includes("relation");
 }
 
+function isSchemaDriftError(error) {
+  const text = describeError(error);
+  return (
+    text.includes("schema cache") ||
+    text.includes("could not find") ||
+    text.includes("column") ||
+    text.includes("record") && text.includes("schema") ||
+    text.includes("does not exist") ||
+    text.includes("relation")
+  );
+}
+
+function warnSchemaDrift(label, error) {
+  console.warn(
+    `${label} could not fully sync to Supabase because the remote schema is behind this app build. ` +
+    `Keeping the latest save locally until you run the updated supabase/schema.sql.`,
+    error
+  );
+}
+
 function rowsMatchExactly(sourceRows, expectedRows) {
   if (sourceRows.length !== expectedRows.length) return false;
 
@@ -1586,6 +1606,11 @@ async function saveAllNodes(nodes, options = {}) {
       return clean;
     }
 
+    if (isSchemaDriftError(error)) {
+      warnSchemaDrift("Opening tree", error);
+      return clean;
+    }
+
     throw error;
   }
 
@@ -1745,6 +1770,11 @@ async function saveAllRepairItems(items, options = {}) {
   } catch (error) {
     if (isConnectivityError(error)) {
       console.warn("Repair sync is unavailable. Keeping the latest repair save locally until the next sync.", error);
+      return clean;
+    }
+
+    if (isSchemaDriftError(error)) {
+      warnSchemaDrift("Repairs", error);
       return clean;
     }
 
@@ -1936,10 +1966,34 @@ async function saveRemoteBackedFlatCollection(items, options) {
       return clean;
     }
 
+    if (isSchemaDriftError(error)) {
+      warnSchemaDrift(label, error);
+      return clean;
+    }
+
     throw error;
   }
 
   return clean;
+}
+
+async function commitAllChanges() {
+  await saveAllNodes(await loadNodes(), { allowEmpty: true });
+  await saveAllRepairItems(await loadRepairItems(), { allowEmpty: true });
+  await saveAllGames(await loadGames(), { allowEmpty: true });
+  await saveAllGameAnnotations(await loadGameAnnotations(), { allowEmpty: true });
+  await saveAllPositions(await loadPositions(), { allowEmpty: true });
+  await saveAllMistakes(await loadMistakes(), { allowEmpty: true });
+  await saveAllSupportCards(await loadSupportCards(), { allowEmpty: true });
+  await saveAllGoals(await loadGoals(), { allowEmpty: true });
+  await saveAllAppReminders(await loadAppReminders(), { allowEmpty: true });
+  await saveAllBooks(await loadBooks(), { allowEmpty: true });
+  await saveAllBookNotes(await loadBookNotes(), { allowEmpty: true });
+  await saveAllTournamentNotes(await loadTournamentNotes(), { allowEmpty: true });
+  await saveAllQuickIdeas(await loadQuickIdeas(), { allowEmpty: true });
+  await saveAllReviewItems(await loadReviewItems(), { allowEmpty: true });
+  await saveAllRepairAttempts(await loadRepairAttempts(), { allowEmpty: true });
+  return true;
 }
 
 async function loadGames() {
@@ -2731,5 +2785,6 @@ window.OpeningDB = {
   saveAllRepairAttempts,
   upsertRepairAttempt,
   deleteRepairAttempt,
-  normalizeRepairAttempt
+  normalizeRepairAttempt,
+  commitAllChanges
 };

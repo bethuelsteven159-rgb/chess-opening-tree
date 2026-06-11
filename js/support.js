@@ -2451,10 +2451,11 @@ $("supportWorkspaceTabs")?.addEventListener("click", event => {
 
 $("syncBtn")?.addEventListener("click", async () => {
   try {
+    await OpeningDB.commitAllChanges?.();
     await refresh();
-    showToast(navigator.onLine ? "Support hub synced." : "Offline mode active. Using your local copy.");
+    showToast(navigator.onLine ? "Support changes committed." : "Offline mode active. Your support data is stored locally.");
   } catch (error) {
-    reportActionError("Syncing support hub", error);
+    reportActionError("Committing support changes", error);
   }
 });
 

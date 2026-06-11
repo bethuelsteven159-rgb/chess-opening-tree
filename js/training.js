@@ -97,13 +97,21 @@ function pathNodesFor(node) {
 
 function openingColorMatches(line) {
   if (state.openingColor === "all") return true;
-  return line.color === state.openingColor;
+  return (line.prompts_by_color?.[state.openingColor] || []).length > 0;
 }
 
 function openingRoots() {
+  const matchingRootIds = new Set(
+    buildLeafLines(nodes, reviewItems)
+      .filter(line => line.prompts.length > 0)
+      .filter(line => openingColorMatches(line))
+      .map(line => line.root_node_id)
+      .filter(Boolean)
+  );
+
   return nodes
     .filter(node => !node.parent_id)
-    .filter(node => state.openingColor === "all" || (moveColor(node.move) === (state.openingColor === "black" ? "b" : "w")))
+    .filter(node => matchingRootIds.has(node.id))
     .sort((left, right) => String(left.title || left.move).localeCompare(String(right.title || right.move)));
 }
 
@@ -118,16 +126,31 @@ function queueEntryBase(entry) {
 function openingLineQueue(mode = state.lineMode, options = {}) {
   const respectFilters = options.respectFilters !== false;
   const lines = buildLeafLines(nodes, reviewItems)
-    .filter(line => line.prompts.length > 0)
+    .map(line => {
+      const prompts = respectFilters && state.openingColor !== "all"
+        ? [...(line.prompts_by_color?.[state.openingColor] || [])]
+        : [...line.prompts];
+      const displayColor = respectFilters && state.openingColor !== "all"
+        ? state.openingColor
+        : line.color;
+
+      return {
+        ...line,
+        active_prompts: prompts,
+        active_color: displayColor
+      };
+    })
+    .filter(line => line.active_prompts.length > 0)
     .filter(line => !respectFilters || openingColorMatches(line))
     .filter(line => !respectFilters || !state.rootId || line.root_node_id === state.rootId)
     .map(line => ({
       ...queueEntryBase({ sourceType: "opening_line", sourceId: line.leaf_node_id }),
       title: line.title,
-      subtitle: `${line.ply_count} ply • ${line.color} • ${line.due_state}`,
+      subtitle: `${line.ply_count} ply • ${line.active_color} • ${line.due_state}`,
       dueState: line.due_state,
       priority: line.review_item?.priority || "normal",
       line,
+      prompts: line.active_prompts,
       reviewItem: line.review_item || null
     }));
 
@@ -299,7 +322,7 @@ function startQueueEntry(entry) {
 
 function currentOpeningStep() {
   if (state.session?.type !== "opening_line") return null;
-  return state.session.entry.line.prompts[state.session.stepIndex] || null;
+  return state.session.entry.prompts[state.session.stepIndex] || null;
 }
 
 function completeSession(message) {
@@ -313,7 +336,7 @@ function completeSession(message) {
 function advanceOpeningStep() {
   const session = state.session;
   if (!session || session.type !== "opening_line") return;
-  if (session.stepIndex >= session.entry.line.prompts.length - 1) {
+  if (session.stepIndex >= session.entry.prompts.length - 1) {
     completeSession("Line complete. Grade how the full recall felt.");
     return;
   }
@@ -417,6 +440,9 @@ function renderSetup() {
   if (rootSelect) {
     rootSelect.disabled = !isOpeningMode;
     const roots = openingRoots();
+    if (state.rootId && !roots.some(root => root.id === state.rootId)) {
+      state.rootId = "";
+    }
     rootSelect.innerHTML = [`<option value="">All roots</option>`]
       .concat(roots.map(root => `<option value="${root.id}" ${root.id === state.rootId ? "selected" : ""}>${escapeHtml(root.title || root.move)} (${escapeHtml(root.move)})</option>`))
       .join("");
@@ -586,8 +612,10 @@ function handleOpeningSubmit(answer) {
 
   if (exactMatch) {
     session.feedback = `Correct: ${step.answerNode.move}.`;
+    session.failed = false;
+    session.revealOpen = true;
     session.canContinue = true;
-    if (session.stepIndex === session.entry.line.prompts.length - 1) {
+    if (session.stepIndex === session.entry.prompts.length - 1) {
       completeSession("Line complete. Grade how the full recall felt.");
     }
     paint();
@@ -759,6 +787,14 @@ async function refresh() {
   if (intent?.mode) {
     state.mode = intent.mode;
     state.selectedQueueId = intent.source_type && intent.source_id ? `${intent.source_type}:${intent.source_id}` : state.selectedQueueId;
+    if (intent.source_type === "opening_line" && intent.source_id) {
+      const targetLine = buildLeafLines(nodes, reviewItems).find(line => line.leaf_node_id === intent.source_id);
+      if (targetLine?.prompts_by_color?.black?.length && !targetLine?.prompts_by_color?.white?.length) {
+        state.openingColor = "black";
+      } else if (targetLine?.prompts_by_color?.white?.length && !targetLine?.prompts_by_color?.black?.length) {
+        state.openingColor = "white";
+      }
+    }
     clearTrainingIntent();
   }
 
@@ -871,6 +907,16 @@ $("reviewAgainBtn")?.addEventListener("click", () => applyGrade("again"));
 $("reviewHardBtn")?.addEventListener("click", () => applyGrade("hard"));
 $("reviewGoodBtn")?.addEventListener("click", () => applyGrade("good"));
 $("reviewEasyBtn")?.addEventListener("click", () => applyGrade("easy"));
+
+$("syncBtn")?.addEventListener("click", async () => {
+  try {
+    await window.OpeningDB.commitAllChanges?.();
+    await refresh();
+    showToast(navigator.onLine ? "Training changes committed." : "Offline mode active. Your training data is stored locally.");
+  } catch (error) {
+    reportActionError("Committing training changes", error);
+  }
+});
 
 try {
   await refresh();

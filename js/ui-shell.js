@@ -682,12 +682,14 @@ export function initPageChrome() {
   const navActions = document.querySelector(".nav-actions");
   const boardAppearanceBtn = ensureActionButton(navActions, "boardAppearanceBtn", boardAppearanceSummary());
   const globalSearchBtn = ensureActionButton(navActions, "globalSearchBtn", "Search");
+  const syncBtn = document.getElementById("syncBtn");
 
   bindThemeToggle(document.getElementById("themeToggleBtn"));
   bindLogoutButton(document.getElementById("logoutBtn"));
 
   boardAppearanceBtn?.addEventListener("click", openBoardAppearanceDialog);
   globalSearchBtn?.addEventListener("click", openGlobalSearch);
+  if (syncBtn) syncBtn.textContent = "Commit changes";
 
   document.addEventListener("keydown", event => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {

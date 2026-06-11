@@ -8,7 +8,7 @@ import {
   createChessGame,
   renderBoardSquares
 } from "./board-tools.js";
-import { boardViewFromFen, escapeHtml, reportActionError, setHtml, setText, showToast } from "./chess-brain-utils.js";
+import { $, boardViewFromFen, escapeHtml, reportActionError, setHtml, setText, showToast } from "./chess-brain-utils.js";
 import { ensureReviewItem } from "./review-utils.js";
 import { getSelectedNodeId, getSelectedRepairId, setSelectedRepairId } from "./navigation-state.js";
 
@@ -367,10 +367,11 @@ $("repairList")?.addEventListener("click", async event => {
 
 $("syncBtn")?.addEventListener("click", async () => {
   try {
+    await window.OpeningDB.commitAllChanges?.();
     await refresh();
-    showToast(navigator.onLine ? "Repair loop synced." : "Offline mode active. Using your local copy.");
+    showToast(navigator.onLine ? "Repair changes committed." : "Offline mode active. Your repair data is stored locally.");
   } catch (error) {
-    reportActionError("Syncing repair loop", error);
+    reportActionError("Committing repair changes", error);
   }
 });
 

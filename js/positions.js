@@ -489,10 +489,11 @@ $("openPositionRepairBtn")?.addEventListener("click", () => {
 
 $("syncBtn")?.addEventListener("click", async () => {
   try {
+    await OpeningDB.commitAllChanges?.();
     await refresh();
-    showToast(navigator.onLine ? "Position vault synced." : "Offline mode active. Using your local copy.");
+    showToast(navigator.onLine ? "Position changes committed." : "Offline mode active. Your position data is stored locally.");
   } catch (error) {
-    reportActionError("Syncing position vault", error);
+    reportActionError("Committing position changes", error);
   }
 });
 

@@ -73,10 +73,9 @@ export function titleForLine(path = []) {
   return String(path[path.length - 1]?.move || "Untitled line").trim() || "Untitled line";
 }
 
-export function trainablePromptsForLine(path = []) {
+export function trainablePromptsForLine(path = [], trainingColor = null) {
   if (!path.length) return [];
 
-  const trainingColor = moveColor(path[0].move);
   return path
     .map((node, index) => ({
       node,
@@ -84,12 +83,13 @@ export function trainablePromptsForLine(path = []) {
       color: moveColor(node.move),
       excluded: node.exclude_from_training === true
     }))
-    .filter(entry => entry.color === trainingColor && !entry.excluded)
+    .filter(entry => !entry.excluded)
+    .filter(entry => !trainingColor || entry.color === trainingColor)
     .map(entry => ({
       answerNode: entry.node,
       answerIndex: entry.index,
       positionNodes: path.slice(0, entry.index),
-      lastOpponentNode: [...path.slice(0, entry.index)].reverse().find(node => moveColor(node.move) !== trainingColor) || null
+      lastOpponentNode: [...path.slice(0, entry.index)].reverse().find(node => moveColor(node.move) !== entry.color) || null
     }));
 }
 
@@ -103,18 +103,28 @@ export function buildLeafLines(nodes = [], reviewItems = []) {
 
   return getLeafNodes(nodes).map(leafNode => {
     const path = pathToRoot(leafNode, byId);
-    const prompts = trainablePromptsForLine(path);
+    const whitePrompts = trainablePromptsForLine(path, "w");
+    const blackPrompts = trainablePromptsForLine(path, "b");
+    const prompts = [...whitePrompts, ...blackPrompts].sort((left, right) => left.answerIndex - right.answerIndex);
     const reviewItem = reviewMap.get(leafNode.id) || null;
-    const trainingColor = path.length ? moveColor(path[0].move) : "w";
+    const lineColor = whitePrompts.length && blackPrompts.length
+      ? "mixed"
+      : blackPrompts.length
+        ? "black"
+        : "white";
 
     return {
       id: `opening-line:${leafNode.id}`,
       leaf_node_id: leafNode.id,
       root_node_id: path[0]?.id || null,
       title: titleForLine(path),
-      color: trainingColor === "b" ? "black" : "white",
+      color: lineColor,
       moves: path,
       prompts,
+      prompts_by_color: {
+        white: whitePrompts,
+        black: blackPrompts
+      },
       ply_count: path.length,
       excluded_count: path.filter(node => node.exclude_from_training === true).length,
       due_state: reviewDueState(reviewItem),

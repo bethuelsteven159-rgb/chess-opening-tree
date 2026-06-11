@@ -1,8 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" role="img" aria-labelledby="title desc">
-  <title>wP chess piece</title>
-  <desc>Chess piece token with the letter P.</desc>
-  <circle cx="40" cy="40" r="33" fill="#fff7e7" stroke="#24334a" stroke-width="4" />
-  <circle cx="40" cy="40" r="28" fill="none" stroke="#d29c35" stroke-width="3" opacity="0.95" />
-  <path d="M22 55h36" stroke="#24334a" stroke-width="3.6" stroke-linecap="round" opacity="0.65" />
-  <text x="40" y="48" text-anchor="middle" font-family="Manrope, Arial, sans-serif" font-size="31" font-weight="800" fill="#24334a">P</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45"><path fill="#fff" stroke="#000" stroke-linecap="round" stroke-width="1.5" d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.38C17.33 16.5 16 18.59 16 21c0 2.03.94 3.84 2.41 5.03-3 1.06-7.41 5.55-7.41 13.47h23c0-7.92-4.41-12.41-7.41-13.47 1.47-1.19 2.41-3 2.41-5.03 0-2.41-1.33-4.5-3.28-5.62.49-.67.78-1.49.78-2.38 0-2.21-1.79-4-4-4z"/></svg>

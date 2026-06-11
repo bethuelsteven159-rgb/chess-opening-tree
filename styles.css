@@ -1239,6 +1239,22 @@ select:focus {
   grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
 }
 
+.trainer-universal-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.trainer-queue-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  height: min(72vh, 980px);
+  max-height: min(72vh, 980px);
+  overflow: hidden;
+}
+
 .trainer-board-panel,
 .trainer-prompt-card,
 .study-card,
@@ -1272,6 +1288,15 @@ select:focus {
 
 .prompt-copy {
   margin-bottom: 12px;
+}
+
+#trainingQueueList {
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+  scrollbar-gutter: stable;
 }
 
 .trainer-answer-row {
@@ -1879,6 +1904,46 @@ select:focus {
   align-items: start;
 }
 
+.game-mistake-list {
+  display: grid;
+  gap: 12px;
+  max-height: 320px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+}
+
+.game-mistake-item {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+}
+
+.game-mistake-item h4 {
+  font-size: 1.05rem;
+}
+
+.game-mistake-item p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.game-mistake-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.game-mistake-actions {
+  margin-top: 4px;
+}
+
 .game-pgn-field textarea {
   min-height: 220px;
 }
@@ -2373,6 +2438,7 @@ select:focus {
   .live-board-layout,
   .repair-focus-layout,
   .workspace-shell,
+  .trainer-universal-grid,
   .dashboard-secondary,
   .repair-workspace,
   .position-secondary,
@@ -2414,6 +2480,11 @@ select:focus {
 
   .trainer-layout {
     grid-template-columns: 1fr;
+  }
+
+  .trainer-queue-panel {
+    height: auto;
+    max-height: none;
   }
 
   .games-workspace {

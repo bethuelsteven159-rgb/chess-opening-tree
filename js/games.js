@@ -2,6 +2,7 @@ import { requireOnlyMe } from "./auth/only-me-guard.js";
 import { bindImportButton, initPageChrome } from "./ui-shell.js";
 import { checklistForGame, checklistProgress, gameNeedsWork, gameStatusLabel } from "./game-analysis-utils.js";
 import { getStoredBoardAppearance } from "./board-appearance.js";
+import { setSelectedPositionId, setSelectedRepairId } from "./navigation-state.js";
 import {
   $,
   annotationLabel,
@@ -68,6 +69,14 @@ function saveSelection() {
 
 function selectedGame() {
   return games.find(game => game.id === selectedGameId) || null;
+}
+
+function repairById(id) {
+  return repairs.find(repair => repair.id === id) || null;
+}
+
+function positionById(id) {
+  return positions.find(position => position.id === id) || null;
 }
 
 function selectedGameAnnotations() {
@@ -373,6 +382,54 @@ function renderChecklist() {
   `).join("");
 }
 
+function renderMistakeList() {
+  const host = $("gameMistakeList");
+  if (!host) return;
+
+  const game = selectedGame();
+  if (!game) {
+    host.innerHTML = `<div class="line-empty">Select a game to see its saved mistake records.</div>`;
+    return;
+  }
+
+  const gameMistakes = mistakes
+    .filter(mistake => mistake.source_type === "game" && mistake.source_id === game.id)
+    .sort((left, right) => String(right.updated_at || right.created_at || "").localeCompare(String(left.updated_at || left.created_at || "")));
+
+  host.innerHTML = gameMistakes.length
+    ? gameMistakes.map(mistake => {
+      const linkedAnnotation = selectedGameAnnotations().find(annotation => annotation.mistake_id === mistake.id) || null;
+      const linkedPosition = positionById(mistake.position_id);
+      const linkedRepair = linkedAnnotation?.repair_id
+        ? repairById(linkedAnnotation.repair_id)
+        : repairs.find(repair => repair.linked_position_id === mistake.position_id) || null;
+      const summary = mistake.correct_thinking_rule || mistake.why_it_happened || mistake.what_i_missed || "No summary saved yet.";
+
+      return `
+        <article class="game-mistake-item" data-mistake-id="${mistake.id}">
+          <div class="game-mistake-meta">
+            <span class="study-choice-kicker">${escapeHtml(mistake.category || "mistake")}</span>
+            <span class="mini-tag">${escapeHtml(mistake.severity || "normal")}</span>
+            ${mistake.side ? `<span class="mini-tag">${escapeHtml(mistake.side)}</span>` : ""}
+          </div>
+          <h4>${escapeHtml(mistake.title || "Mistake record")}</h4>
+          <p>${escapeHtml(summary)}</p>
+          <div class="game-mistake-meta">
+            <span>${escapeHtml(linkedAnnotation ? annotationLabel(linkedAnnotation) : "No move jump saved yet")}</span>
+            <span>${escapeHtml(linkedPosition?.title || "No linked position yet")}</span>
+            <span>${escapeHtml(linkedRepair?.mistake || "No repair card yet")}</span>
+          </div>
+          <div class="form-actions game-mistake-actions">
+            <button class="button button-secondary button-tiny" type="button" data-mistake-action="jump"${linkedAnnotation ? "" : " disabled"}>Jump to move</button>
+            <button class="button button-ghost button-tiny" type="button" data-mistake-action="position"${linkedPosition ? "" : " disabled"}>Open position</button>
+            <button class="button button-primary button-tiny" type="button" data-mistake-action="repair"${linkedRepair ? "" : " disabled"}>Open repair</button>
+          </div>
+        </article>
+      `;
+    }).join("")
+    : `<div class="line-empty">No mistake records for this game yet. Save one from a move, then use this list to revisit it.</div>`;
+}
+
 function renderAnnotationEditor() {
   const annotation = selectedAnnotation();
   const disabled = !annotation;
@@ -442,6 +499,7 @@ function paint() {
   renderReplayBoard();
   renderGameMeta();
   renderChecklist();
+  renderMistakeList();
   renderAnnotationEditor();
   updateReplayControls();
 }
@@ -798,6 +856,36 @@ if (moveList) {
   });
 }
 
+$("gameMistakeList")?.addEventListener("click", event => {
+  const button = event.target.closest("[data-mistake-action]");
+  const row = event.target.closest("[data-mistake-id]");
+  if (!button || !row) return;
+
+  const mistake = mistakes.find(entry => entry.id === row.dataset.mistakeId);
+  if (!mistake) return;
+
+  const linkedAnnotation = selectedGameAnnotations().find(annotation => annotation.mistake_id === mistake.id) || null;
+  const linkedRepair = linkedAnnotation?.repair_id
+    ? repairById(linkedAnnotation.repair_id)
+    : repairs.find(repair => repair.linked_position_id === mistake.position_id) || null;
+
+  if (button.dataset.mistakeAction === "jump" && linkedAnnotation) {
+    setSelectedPly(linkedAnnotation.ply || 0);
+    return;
+  }
+
+  if (button.dataset.mistakeAction === "position" && mistake.position_id) {
+    setSelectedPositionId(mistake.position_id);
+    window.location.href = "./positions.html";
+    return;
+  }
+
+  if (button.dataset.mistakeAction === "repair" && linkedRepair) {
+    setSelectedRepairId(linkedRepair.id);
+    window.location.href = "./repair.html";
+  }
+});
+
 $("importGameBtn")?.addEventListener("click", async () => {
   try {
     await importCurrentPgn();
@@ -918,10 +1006,11 @@ $("gameExportBtn")?.addEventListener("click", () => {
 
 $("syncBtn")?.addEventListener("click", async () => {
   try {
+    await OpeningDB.commitAllChanges?.();
     await refresh();
-    showToast(navigator.onLine ? "Game studio synced." : "Offline mode active. Using your local copy.");
+    showToast(navigator.onLine ? "Game changes committed." : "Offline mode active. Your game data is stored locally.");
   } catch (error) {
-    reportActionError("Syncing game studio", error);
+    reportActionError("Committing game changes", error);
   }
 });
 

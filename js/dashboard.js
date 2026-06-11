@@ -13,7 +13,7 @@ import {
   setSelectedRepairId,
   setTrainingIntent
 } from "./navigation-state.js";
-import { $, escapeHtml, reportActionError, setHtml, setText } from "./chess-brain-utils.js";
+import { $, escapeHtml, reportActionError, setHtml, setText, showToast } from "./chess-brain-utils.js";
 
 await requireOnlyMe();
 initPageChrome();
@@ -441,6 +441,16 @@ $("todayMissionList")?.addEventListener("click", event => {
   }
 
   openSupportByResult(type, id);
+});
+
+$("syncBtn")?.addEventListener("click", async () => {
+  try {
+    await window.OpeningDB.commitAllChanges?.();
+    await refresh();
+    showToast(navigator.onLine ? "Changes committed." : "Offline mode active. Your local dashboard data is preserved.");
+  } catch (error) {
+    reportActionError("Committing dashboard changes", error);
+  }
 });
 
 try {
