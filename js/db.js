@@ -1,3 +1,4 @@
+import { workspaceStorage, requireWorkspaceUserId } from "./auth/user-workspace.js";
 const LEGACY_NODE_STORAGE_KEY = "gm_opening_tree_local_v1";
 const NODE_STORAGE_KEY = "gm_opening_tree_local_v2";
 const REPAIR_STORAGE_KEY = "gm_opening_tree_repairs_v1";
@@ -673,20 +674,20 @@ function normalizeRepairAttempt(attempt) {
 }
 
 function readLocalJson(key) {
-  const raw = localStorage.getItem(key);
+  const raw = workspaceStorage.getItem(key);
   return raw ? JSON.parse(raw) : null;
 }
 
 function writeLocalJson(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  workspaceStorage.setItem(key, JSON.stringify(value));
 }
 
 function clearLocalJson(key) {
-  localStorage.removeItem(key);
+  workspaceStorage.removeItem(key);
 }
 
 function hasLocalJson(key) {
-  return localStorage.getItem(key) !== null;
+  return workspaceStorage.getItem(key) !== null;
 }
 
 function readStoredArray(key, normalizer) {
@@ -1211,6 +1212,7 @@ async function loadNodesFromRemote(client, table) {
   const { data, error } = await client
     .from(table)
     .select("*")
+    .eq("user_id", requireWorkspaceUserId())
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -1225,6 +1227,7 @@ async function loadRepairItemsFromRemote(client, table) {
   const { data, error } = await client
     .from(table)
     .select("*")
+    .eq("user_id", requireWorkspaceUserId())
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -1239,6 +1242,7 @@ async function loadGamesFromRemote(client, table) {
   const { data, error } = await client
     .from(table)
     .select("*")
+    .eq("user_id", requireWorkspaceUserId())
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -1253,6 +1257,7 @@ async function loadGameAnnotationsFromRemote(client, table) {
   const { data, error } = await client
     .from(table)
     .select("*")
+    .eq("user_id", requireWorkspaceUserId())
     .order("game_id", { ascending: true })
     .order("ply", { ascending: true });
 
@@ -1268,6 +1273,7 @@ async function loadPositionsFromRemote(client, table) {
   const { data, error } = await client
     .from(table)
     .select("*")
+    .eq("user_id", requireWorkspaceUserId())
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -1282,6 +1288,7 @@ async function loadMistakesFromRemote(client, table) {
   const { data, error } = await client
     .from(table)
     .select("*")
+    .eq("user_id", requireWorkspaceUserId())
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -1296,6 +1303,7 @@ async function loadSupportCardsFromRemote(client, table) {
   const { data, error } = await client
     .from(table)
     .select("*")
+    .eq("user_id", requireWorkspaceUserId())
     .order("pinned", { ascending: false })
     .order("updated_at", { ascending: false });
 
@@ -1311,6 +1319,7 @@ async function loadGoalsFromRemote(client, table) {
   const { data, error } = await client
     .from(table)
     .select("*")
+    .eq("user_id", requireWorkspaceUserId())
     .order("updated_at", { ascending: false });
 
   if (error) {
@@ -1325,6 +1334,7 @@ async function loadAppRemindersFromRemote(client, table) {
   const { data, error } = await client
     .from(table)
     .select("*")
+    .eq("user_id", requireWorkspaceUserId())
     .order("updated_at", { ascending: false });
 
   if (error) {
@@ -1339,6 +1349,7 @@ async function loadBooksFromRemote(client, table) {
   const { data, error } = await client
     .from(table)
     .select("*")
+    .eq("user_id", requireWorkspaceUserId())
     .order("updated_at", { ascending: false });
 
   if (error) {
@@ -1353,6 +1364,7 @@ async function loadBookNotesFromRemote(client, table) {
   const { data, error } = await client
     .from(table)
     .select("*")
+    .eq("user_id", requireWorkspaceUserId())
     .order("book_id", { ascending: true })
     .order("created_at", { ascending: true });
 
@@ -1368,6 +1380,7 @@ async function loadTournamentNotesFromRemote(client, table) {
   const { data, error } = await client
     .from(table)
     .select("*")
+    .eq("user_id", requireWorkspaceUserId())
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -1382,6 +1395,7 @@ async function loadQuickIdeasFromRemote(client, table) {
   const { data, error } = await client
     .from(table)
     .select("*")
+    .eq("user_id", requireWorkspaceUserId())
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -1396,6 +1410,7 @@ async function loadReviewItemsFromRemote(client, table) {
   const { data, error } = await client
     .from(table)
     .select("*")
+    .eq("user_id", requireWorkspaceUserId())
     .order("due_at", { ascending: true })
     .order("updated_at", { ascending: false });
 
@@ -1411,6 +1426,7 @@ async function loadRepairAttemptsFromRemote(client, table) {
   const { data, error } = await client
     .from(table)
     .select("*")
+    .eq("user_id", requireWorkspaceUserId())
     .order("attempted_at", { ascending: false });
 
   if (error) {
@@ -1434,7 +1450,7 @@ async function syncNodesToRemote(client, table, clean, options = {}) {
 
   for (const node of orderedNodes) {
     const row = stripUnsupportedNodeFields(node, support);
-    const { error } = await client.from(table).upsert(row, { onConflict: "id" });
+    const { error } = await client.from(table).upsert({ ...row, user_id: requireWorkspaceUserId() }, { onConflict: "id" });
 
     if (error) {
       console.error("Supabase upsert failed:", error);
@@ -1446,7 +1462,7 @@ async function syncNodesToRemote(client, table, clean, options = {}) {
   const deleteRoots = deleteRootsForRemovedNodes(remoteNodes, keepIds);
 
   for (const id of deleteRoots) {
-    const { error } = await client.from(table).delete().eq("id", id);
+    const { error } = await client.from(table).delete().eq("user_id", requireWorkspaceUserId()).eq("id", id);
 
     if (error) {
       console.error("Supabase delete failed:", error);
@@ -1466,7 +1482,7 @@ async function syncRepairItemsToRemote(client, table, clean, options = {}) {
   ensureUniqueIds(clean, "repair list");
 
   for (const item of clean) {
-    const { error } = await client.from(table).upsert(item, { onConflict: "id" });
+    const { error } = await client.from(table).upsert({ ...item, user_id: requireWorkspaceUserId() }, { onConflict: "id" });
 
     if (error) {
       console.error("Supabase repair upsert failed:", error);
@@ -1480,7 +1496,7 @@ async function syncRepairItemsToRemote(client, table, clean, options = {}) {
     .map(item => item.id);
 
   if (removeIds.length) {
-    const { error } = await client.from(table).delete().in("id", removeIds);
+    const { error } = await client.from(table).delete().eq("user_id", requireWorkspaceUserId()).in("id", removeIds);
 
     if (error) {
       console.error("Supabase repair delete failed:", error);
@@ -1500,7 +1516,7 @@ async function syncFlatRowsToRemote(client, table, clean, label, remoteLoader, o
   ensureUniqueIds(clean, label);
 
   for (const item of clean) {
-    const { error } = await client.from(table).upsert(item, { onConflict: "id" });
+    const { error } = await client.from(table).upsert({ ...item, user_id: requireWorkspaceUserId() }, { onConflict: "id" });
 
     if (error) {
       console.error(`Supabase ${label} upsert failed:`, error);
@@ -1514,7 +1530,7 @@ async function syncFlatRowsToRemote(client, table, clean, label, remoteLoader, o
     .map(item => item.id);
 
   if (removeIds.length) {
-    const { error } = await client.from(table).delete().in("id", removeIds);
+    const { error } = await client.from(table).delete().eq("user_id", requireWorkspaceUserId()).in("id", removeIds);
 
     if (error) {
       console.error(`Supabase ${label} delete failed:`, error);

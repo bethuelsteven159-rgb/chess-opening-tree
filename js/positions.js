@@ -1,3 +1,4 @@
+import { workspaceStorage, requireWorkspaceUserId } from "./auth/user-workspace.js";
 import { requireOnlyMe } from "./auth/only-me-guard.js";
 import { initPageChrome } from "./ui-shell.js";
 import { ensureReviewItem } from "./review-utils.js";
@@ -32,11 +33,11 @@ let repairs = [];
 let positions = [];
 let mistakes = [];
 let reviewItems = [];
-let selectedPositionId = localStorage.getItem(SELECTED_POSITION_STORAGE_KEY) || null;
+let selectedPositionId = workspaceStorage.getItem(SELECTED_POSITION_STORAGE_KEY) || null;
 
 function saveSelection() {
-  if (selectedPositionId) localStorage.setItem(SELECTED_POSITION_STORAGE_KEY, selectedPositionId);
-  else localStorage.removeItem(SELECTED_POSITION_STORAGE_KEY);
+  if (selectedPositionId) workspaceStorage.setItem(SELECTED_POSITION_STORAGE_KEY, selectedPositionId);
+  else workspaceStorage.removeItem(SELECTED_POSITION_STORAGE_KEY);
 }
 
 function selectedPosition() {
@@ -463,11 +464,11 @@ $("openPositionGameBtn")?.addEventListener("click", () => {
   const game = linkedGame(position);
   if (!position || !game) return;
 
-  localStorage.setItem(SELECTED_GAME_STORAGE_KEY, game.id);
+  workspaceStorage.setItem(SELECTED_GAME_STORAGE_KEY, game.id);
   const ply = position.move_number
     ? (position.side_to_move === "w" ? Math.max(0, (position.move_number * 2) - 2) : Math.max(0, (position.move_number * 2) - 1))
     : 0;
-  localStorage.setItem(SELECTED_GAME_PLY_STORAGE_KEY, String(Math.max(0, ply)));
+  workspaceStorage.setItem(SELECTED_GAME_PLY_STORAGE_KEY, String(Math.max(0, ply)));
   window.location.href = "./games.html";
 });
 
@@ -475,7 +476,7 @@ $("openPositionEditorBtn")?.addEventListener("click", () => {
   const position = selectedPosition();
   if (!position?.linked_opening_node_id) return;
 
-  localStorage.setItem(SELECTED_NODE_STORAGE_KEY, position.linked_opening_node_id);
+  workspaceStorage.setItem(SELECTED_NODE_STORAGE_KEY, position.linked_opening_node_id);
   window.location.href = "./editor.html";
 });
 
@@ -483,7 +484,7 @@ $("openPositionRepairBtn")?.addEventListener("click", () => {
   const position = selectedPosition();
   if (!position?.linked_repair_id) return;
 
-  localStorage.setItem(SELECTED_REPAIR_STORAGE_KEY, position.linked_repair_id);
+  workspaceStorage.setItem(SELECTED_REPAIR_STORAGE_KEY, position.linked_repair_id);
   window.location.href = "./repair.html";
 });
 

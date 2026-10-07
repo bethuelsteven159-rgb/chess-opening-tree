@@ -1,4 +1,4 @@
-const CACHE_NAME = "gm-opening-tree-v12";
+const CACHE_NAME = "gm-opening-tree-v13";
 const PIECE_ASSETS = [
   "assets/pieces/classic/wK.svg",
   "assets/pieces/classic/wQ.svg",
@@ -46,6 +46,7 @@ const SCRIPT_ASSETS = [
   "js/repair.js",
   "js/support.js",
   "js/auth/login.js",
+  "js/auth/user-workspace.js",
   "js/auth/only-me-guard.js"
 ];
 

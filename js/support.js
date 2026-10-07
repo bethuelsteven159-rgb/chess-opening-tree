@@ -1,3 +1,4 @@
+import { workspaceStorage, requireWorkspaceUserId } from "./auth/user-workspace.js";
 import { requireOnlyMe } from "./auth/only-me-guard.js";
 import { initPageChrome } from "./ui-shell.js";
 import {
@@ -137,9 +138,9 @@ let quickIdeas = [];
 let linkedGames = [];
 let linkedPositions = [];
 let linkedRepairs = [];
-let selectedBookId = localStorage.getItem(SELECTED_BOOK_STORAGE_KEY) || null;
+let selectedBookId = workspaceStorage.getItem(SELECTED_BOOK_STORAGE_KEY) || null;
 let randomCardId = null;
-let selectedSupportPane = localStorage.getItem(SELECTED_SUPPORT_PANE_STORAGE_KEY) || "quick";
+let selectedSupportPane = workspaceStorage.getItem(SELECTED_SUPPORT_PANE_STORAGE_KEY) || "quick";
 
 if (!SUPPORT_PANES.has(selectedSupportPane)) {
   selectedSupportPane = "quick";
@@ -150,9 +151,9 @@ function nowIso() {
 }
 
 function consumeSupportFocus() {
-  const raw = localStorage.getItem(SUPPORT_FOCUS_STORAGE_KEY);
+  const raw = workspaceStorage.getItem(SUPPORT_FOCUS_STORAGE_KEY);
   if (!raw) return null;
-  localStorage.removeItem(SUPPORT_FOCUS_STORAGE_KEY);
+  workspaceStorage.removeItem(SUPPORT_FOCUS_STORAGE_KEY);
 
   try {
     const parsed = JSON.parse(raw);
@@ -163,12 +164,12 @@ function consumeSupportFocus() {
 }
 
 function saveSelectedSupportPane() {
-  localStorage.setItem(SELECTED_SUPPORT_PANE_STORAGE_KEY, selectedSupportPane);
+  workspaceStorage.setItem(SELECTED_SUPPORT_PANE_STORAGE_KEY, selectedSupportPane);
 }
 
 function saveSelectedBook() {
-  if (selectedBookId) localStorage.setItem(SELECTED_BOOK_STORAGE_KEY, selectedBookId);
-  else localStorage.removeItem(SELECTED_BOOK_STORAGE_KEY);
+  if (selectedBookId) workspaceStorage.setItem(SELECTED_BOOK_STORAGE_KEY, selectedBookId);
+  else workspaceStorage.removeItem(SELECTED_BOOK_STORAGE_KEY);
 }
 
 function selectedBook() {

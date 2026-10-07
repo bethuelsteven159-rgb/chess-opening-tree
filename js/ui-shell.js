@@ -1,3 +1,5 @@
+import "./db.js";
+import { workspaceStorage, workspaceUser } from "./auth/user-workspace.js";
 import { supabase } from "./config/supabase.js";
 import {
   applyBoardAppearance,
@@ -193,7 +195,7 @@ function supportTargetForResult(result) {
     quick_idea: "ideas"
   };
   const pane = paneByType[result.type] || "quick";
-  localStorage.setItem("gm_support_focus_v1", JSON.stringify({
+  workspaceStorage.setItem("gm_support_focus_v1", JSON.stringify({
     pane,
     type: result.type,
     id: result.id
@@ -678,6 +680,19 @@ export function bindImportButton(triggerButton, input) {
 export function initPageChrome() {
   applyTheme();
   applyBoardAppearance();
+  const logoutButton = document.getElementById("logoutBtn");
+  if (logoutButton) {
+    logoutButton.hidden = !workspaceUser;
+    if (workspaceUser) logoutButton.title = 'Signed in as ' + workspaceUser.email;
+  }
+  const accountActions = document.querySelector(".nav-actions");
+  if (workspaceUser && accountActions && !document.getElementById("accountLabel")) {
+    const label = document.createElement("span");
+    label.id = "accountLabel";
+    label.className = "muted";
+    label.textContent = workspaceUser.email || "Signed in";
+    accountActions.prepend(label);
+  }
 
   const navActions = document.querySelector(".nav-actions");
   const boardAppearanceBtn = ensureActionButton(navActions, "boardAppearanceBtn", boardAppearanceSummary());

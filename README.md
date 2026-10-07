@@ -2,7 +2,7 @@
 
 GM Opening Tree is a local-first private chess brain.
 
-It is built to help one player:
+Each signed-in player has a private workspace to:
 
 - store what they understand
 - capture lessons from games, books, and study
@@ -279,3 +279,15 @@ The final shape is:
 - Training = review what must be remembered
 - Repair = fix repeating leaks
 - Support = keep the bigger mission connected to the chess work
+
+## Multiple users
+
+Any Google account can sign in. Each account has its own repertoire, games, notes, reviews, recovery snapshots, and pending offline saves. The account is shown beside Logout; to switch accounts, log out and sign in with another Google account.
+
+Before inviting users, run `supabase/multi-user.sql` in your Supabase SQL Editor (or the complete updated `supabase/schema.sql` for a new installation). This assigns existing rows to the original owner, adds ownership to all 15 collections, and replaces public access policies with authenticated owner-only access. It runs in a transaction and can be rerun. If existing rows are present but the original owner is missing from Supabase Auth, it stops without assigning those rows to another account.
+
+In Supabase Authentication settings, enable new user signups and the Google provider, and allow your app's index.html URL as an OAuth redirect. Apply the SQL before publishing this build. The app keeps local changes if the database has not yet been migrated, but the old database policies do not protect multiple accounts.
+
+The original owner's old browser data is copied into their account's local workspace on their first login; the legacy copies remain available for recovery. Other users start with their own sample repertoire. Board appearance and theme remain device preferences. Backups can still be intentionally imported into the currently signed-in workspace.
+
+Database isolation follows [Supabase's row-level security guidance](https://supabase.com/docs/guides/database/postgres/row-level-security).

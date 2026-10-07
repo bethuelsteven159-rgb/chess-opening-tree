@@ -1,3 +1,4 @@
+import { workspaceStorage, requireWorkspaceUserId } from "./auth/user-workspace.js";
 import { requireOnlyMe } from "./auth/only-me-guard.js";
 import { initPageChrome } from "./ui-shell.js";
 import { buildLeafLines, reviewDueState } from "./review-utils.js";
@@ -336,7 +337,7 @@ function renderMissions() {
 }
 
 function openSupportByResult(type, id) {
-  localStorage.setItem("gm_support_focus_v1", JSON.stringify({
+  workspaceStorage.setItem("gm_support_focus_v1", JSON.stringify({
     pane: {
       support_card: "cards",
       card: "cards",

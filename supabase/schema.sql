@@ -1,3 +1,4 @@
+begin;
 -- Run this in the Supabase SQL Editor.
 -- The policies below stay open for solo use while you are still shaping the app.
 
@@ -799,333 +800,86 @@ create index if not exists tournament_notes_game_idx on tournament_notes(linked_
 create index if not exists tournament_notes_position_idx on tournament_notes(linked_position_id);
 create index if not exists tournament_notes_repair_idx on tournament_notes(linked_repair_id);
 
-alter table opening_nodes enable row level security;
-alter table repair_items enable row level security;
-alter table games enable row level security;
-alter table positions enable row level security;
-alter table mistakes enable row level security;
-alter table game_annotations enable row level security;
-alter table support_cards enable row level security;
-alter table goals enable row level security;
-alter table app_reminders enable row level security;
-alter table books enable row level security;
-alter table book_notes enable row level security;
-alter table tournament_notes enable row level security;
-alter table quick_ideas enable row level security;
-alter table review_items enable row level security;
-alter table repair_attempts enable row level security;
-
-drop policy if exists "Allow public read" on opening_nodes;
-drop policy if exists "Allow public insert" on opening_nodes;
-drop policy if exists "Allow public update" on opening_nodes;
-drop policy if exists "Allow public delete" on opening_nodes;
-
-create policy "Allow public read"
-on opening_nodes for select
-using (true);
-
-create policy "Allow public insert"
-on opening_nodes for insert
-with check (true);
-
-create policy "Allow public update"
-on opening_nodes for update
-using (true);
-
-create policy "Allow public delete"
-on opening_nodes for delete
-using (true);
-
-drop policy if exists "Allow public read" on repair_items;
-drop policy if exists "Allow public insert" on repair_items;
-drop policy if exists "Allow public update" on repair_items;
-drop policy if exists "Allow public delete" on repair_items;
-
-create policy "Allow public read"
-on repair_items for select
-using (true);
-
-create policy "Allow public insert"
-on repair_items for insert
-with check (true);
-
-create policy "Allow public update"
-on repair_items for update
-using (true);
-
-create policy "Allow public delete"
-on repair_items for delete
-using (true);
-
-drop policy if exists "Allow public read" on games;
-drop policy if exists "Allow public insert" on games;
-drop policy if exists "Allow public update" on games;
-drop policy if exists "Allow public delete" on games;
-
-create policy "Allow public read"
-on games for select
-using (true);
-
-create policy "Allow public insert"
-on games for insert
-with check (true);
-
-create policy "Allow public update"
-on games for update
-using (true);
-
-create policy "Allow public delete"
-on games for delete
-using (true);
-
-drop policy if exists "Allow public read" on positions;
-drop policy if exists "Allow public insert" on positions;
-drop policy if exists "Allow public update" on positions;
-drop policy if exists "Allow public delete" on positions;
-
-create policy "Allow public read"
-on positions for select
-using (true);
-
-create policy "Allow public insert"
-on positions for insert
-with check (true);
-
-create policy "Allow public update"
-on positions for update
-using (true);
-
-create policy "Allow public delete"
-on positions for delete
-using (true);
-
-drop policy if exists "Allow public read" on mistakes;
-drop policy if exists "Allow public insert" on mistakes;
-drop policy if exists "Allow public update" on mistakes;
-drop policy if exists "Allow public delete" on mistakes;
-
-create policy "Allow public read"
-on mistakes for select
-using (true);
-
-create policy "Allow public insert"
-on mistakes for insert
-with check (true);
-
-create policy "Allow public update"
-on mistakes for update
-using (true);
-
-create policy "Allow public delete"
-on mistakes for delete
-using (true);
-
-drop policy if exists "Allow public read" on game_annotations;
-drop policy if exists "Allow public insert" on game_annotations;
-drop policy if exists "Allow public update" on game_annotations;
-drop policy if exists "Allow public delete" on game_annotations;
-
-create policy "Allow public read"
-on game_annotations for select
-using (true);
-
-create policy "Allow public insert"
-on game_annotations for insert
-with check (true);
-
-create policy "Allow public update"
-on game_annotations for update
-using (true);
-
-create policy "Allow public delete"
-on game_annotations for delete
-using (true);
-
-drop policy if exists "Allow public read" on support_cards;
-drop policy if exists "Allow public insert" on support_cards;
-drop policy if exists "Allow public update" on support_cards;
-drop policy if exists "Allow public delete" on support_cards;
-
-create policy "Allow public read"
-on support_cards for select
-using (true);
-
-create policy "Allow public insert"
-on support_cards for insert
-with check (true);
-
-create policy "Allow public update"
-on support_cards for update
-using (true);
-
-create policy "Allow public delete"
-on support_cards for delete
-using (true);
-
-drop policy if exists "Allow public read" on books;
-drop policy if exists "Allow public insert" on books;
-drop policy if exists "Allow public update" on books;
-drop policy if exists "Allow public delete" on books;
-
-create policy "Allow public read"
-on books for select
-using (true);
-
-create policy "Allow public insert"
-on books for insert
-with check (true);
-
-create policy "Allow public update"
-on books for update
-using (true);
-
-create policy "Allow public delete"
-on books for delete
-using (true);
-
-drop policy if exists "Allow public read" on goals;
-drop policy if exists "Allow public insert" on goals;
-drop policy if exists "Allow public update" on goals;
-drop policy if exists "Allow public delete" on goals;
-
-create policy "Allow public read"
-on goals for select
-using (true);
-
-create policy "Allow public insert"
-on goals for insert
-with check (true);
-
-create policy "Allow public update"
-on goals for update
-using (true);
-
-create policy "Allow public delete"
-on goals for delete
-using (true);
-
-drop policy if exists "Allow public read" on app_reminders;
-drop policy if exists "Allow public insert" on app_reminders;
-drop policy if exists "Allow public update" on app_reminders;
-drop policy if exists "Allow public delete" on app_reminders;
-
-create policy "Allow public read"
-on app_reminders for select
-using (true);
-
-create policy "Allow public insert"
-on app_reminders for insert
-with check (true);
-
-create policy "Allow public update"
-on app_reminders for update
-using (true);
-
-create policy "Allow public delete"
-on app_reminders for delete
-using (true);
-
-drop policy if exists "Allow public read" on book_notes;
-drop policy if exists "Allow public insert" on book_notes;
-drop policy if exists "Allow public update" on book_notes;
-drop policy if exists "Allow public delete" on book_notes;
-
-create policy "Allow public read"
-on book_notes for select
-using (true);
-
-create policy "Allow public insert"
-on book_notes for insert
-with check (true);
-
-create policy "Allow public update"
-on book_notes for update
-using (true);
-
-create policy "Allow public delete"
-on book_notes for delete
-using (true);
-
-drop policy if exists "Allow public read" on tournament_notes;
-drop policy if exists "Allow public insert" on tournament_notes;
-drop policy if exists "Allow public update" on tournament_notes;
-drop policy if exists "Allow public delete" on tournament_notes;
-
-create policy "Allow public read"
-on tournament_notes for select
-using (true);
-
-create policy "Allow public insert"
-on tournament_notes for insert
-with check (true);
-
-create policy "Allow public update"
-on tournament_notes for update
-using (true);
-
-create policy "Allow public delete"
-on tournament_notes for delete
-using (true);
-
-drop policy if exists "Allow public read" on quick_ideas;
-drop policy if exists "Allow public insert" on quick_ideas;
-drop policy if exists "Allow public update" on quick_ideas;
-drop policy if exists "Allow public delete" on quick_ideas;
-
-create policy "Allow public read"
-on quick_ideas for select
-using (true);
-
-create policy "Allow public insert"
-on quick_ideas for insert
-with check (true);
-
-create policy "Allow public update"
-on quick_ideas for update
-using (true);
-
-create policy "Allow public delete"
-on quick_ideas for delete
-using (true);
-
-drop policy if exists "Allow public read" on review_items;
-drop policy if exists "Allow public insert" on review_items;
-drop policy if exists "Allow public update" on review_items;
-drop policy if exists "Allow public delete" on review_items;
-
-create policy "Allow public read"
-on review_items for select
-using (true);
-
-create policy "Allow public insert"
-on review_items for insert
-with check (true);
-
-create policy "Allow public update"
-on review_items for update
-using (true);
-
-create policy "Allow public delete"
-on review_items for delete
-using (true);
-
-drop policy if exists "Allow public read" on repair_attempts;
-drop policy if exists "Allow public insert" on repair_attempts;
-drop policy if exists "Allow public update" on repair_attempts;
-drop policy if exists "Allow public delete" on repair_attempts;
-
-create policy "Allow public read"
-on repair_attempts for select
-using (true);
-
-create policy "Allow public insert"
-on repair_attempts for insert
-with check (true);
-
-create policy "Allow public update"
-on repair_attempts for update
-using (true);
-
-create policy "Allow public delete"
-on repair_attempts for delete
-using (true);
+-- Multi-user migration: run in the Supabase SQL Editor before inviting users.
+-- Existing single-user rows belong to the original account, never the caller.
+do $$
+declare
+  table_name text;
+  policy_row record;
+  original_owner uuid;
+  has_legacy_rows boolean;
+begin
+  select id into original_owner from auth.users
+    where lower(email) = 'bethuelsteven159@gmail.com' limit 1;
+  foreach table_name in array array[
+    'opening_nodes', 'repair_items', 'games', 'game_annotations', 'positions',
+    'mistakes', 'support_cards', 'goals', 'app_reminders', 'books', 'book_notes',
+    'tournament_notes', 'quick_ideas', 'review_items', 'repair_attempts'
+  ] loop
+    execute format('alter table public.%I add column if not exists user_id uuid references auth.users(id)', table_name);
+    execute format('select exists(select 1 from public.%I where user_id is null)', table_name) into has_legacy_rows;
+    if has_legacy_rows and original_owner is null then
+      raise exception 'Original owner account missing. Restore the original account before migrating existing study data.';
+    end if;
+    execute format('update public.%I set user_id = $1 where user_id is null', table_name) using original_owner;
+    execute format('alter table public.%I alter column user_id set default auth.uid(), alter column user_id set not null', table_name);
+    execute format('create index if not exists %I on public.%I(user_id)', table_name || '_user_id_idx', table_name);
+    execute format('alter table public.%I enable row level security', table_name);
+    -- Permissive policies combine with OR, so remove every previous policy.
+    for policy_row in select policyname from pg_policies
+      where schemaname = 'public' and tablename = table_name
+    loop
+      execute format('drop policy %I on public.%I', policy_row.policyname, table_name);
+    end loop;
+    execute format('create policy "Users manage own data" on public.%I for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id)', table_name);
+  end loop;
+end $$;
+
+-- Foreign keys also need ownership checks: a user must not link a row to
+-- another user's game, node, or note (including links with cascade deletes).
+create or replace function public.check_study_link_owner()
+returns trigger language plpgsql set search_path = public as $$
+declare
+  link record;
+  linked_id uuid;
+  same_owner boolean;
+begin
+  for link in
+    select a.attname, c.confrelid::regclass as target_table
+    from pg_constraint c
+    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]
+    where c.contype = 'f' and c.conrelid = TG_RELID
+      and array_length(c.conkey, 1) = 1
+      and c.confrelid in (
+        select attrelid from pg_attribute where attname = 'user_id'
+          and not attisdropped and attrelid in (
+            select oid from pg_class where relnamespace = 'public'::regnamespace
+          )
+      )
+  loop
+    linked_id := (to_jsonb(NEW) ->> link.attname)::uuid;
+    if linked_id is not null then
+      execute format('select exists(select 1 from %s where id = $1 and user_id = $2)', link.target_table)
+        into same_owner using linked_id, NEW.user_id;
+      if not same_owner then
+        raise exception 'Study links must belong to the same account' using errcode = '23503';
+      end if;
+    end if;
+  end loop;
+  return NEW;
+end $$;
+
+do $$
+declare table_name text;
+begin
+  foreach table_name in array array[
+    'opening_nodes', 'repair_items', 'games', 'game_annotations', 'positions',
+    'mistakes', 'support_cards', 'goals', 'app_reminders', 'books', 'book_notes',
+    'tournament_notes', 'quick_ideas', 'review_items', 'repair_attempts'
+  ] loop
+    execute format('drop trigger if exists check_study_link_owner on public.%I', table_name);
+    execute format('create trigger check_study_link_owner before insert or update on public.%I for each row execute function public.check_study_link_owner()', table_name);
+  end loop;
+end $$;
+
+commit;

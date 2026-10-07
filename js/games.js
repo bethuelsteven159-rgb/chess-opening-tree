@@ -1,3 +1,4 @@
+import { workspaceStorage, requireWorkspaceUserId } from "./auth/user-workspace.js";
 import { requireOnlyMe } from "./auth/only-me-guard.js";
 import { bindImportButton, initPageChrome } from "./ui-shell.js";
 import { checklistForGame, checklistProgress, gameNeedsWork, gameStatusLabel } from "./game-analysis-utils.js";
@@ -57,14 +58,14 @@ let books = [];
 let bookNotes = [];
 let tournamentNotes = [];
 let quickIdeas = [];
-let selectedGameId = localStorage.getItem(SELECTED_GAME_STORAGE_KEY) || null;
-let selectedPly = Number.parseInt(localStorage.getItem(SELECTED_GAME_PLY_STORAGE_KEY) || "0", 10) || 0;
+let selectedGameId = workspaceStorage.getItem(SELECTED_GAME_STORAGE_KEY) || null;
+let selectedPly = Number.parseInt(workspaceStorage.getItem(SELECTED_GAME_PLY_STORAGE_KEY) || "0", 10) || 0;
 
 function saveSelection() {
-  if (selectedGameId) localStorage.setItem(SELECTED_GAME_STORAGE_KEY, selectedGameId);
-  else localStorage.removeItem(SELECTED_GAME_STORAGE_KEY);
+  if (selectedGameId) workspaceStorage.setItem(SELECTED_GAME_STORAGE_KEY, selectedGameId);
+  else workspaceStorage.removeItem(SELECTED_GAME_STORAGE_KEY);
 
-  localStorage.setItem(SELECTED_GAME_PLY_STORAGE_KEY, String(selectedPly || 0));
+  workspaceStorage.setItem(SELECTED_GAME_PLY_STORAGE_KEY, String(selectedPly || 0));
 }
 
 function selectedGame() {

@@ -1,3 +1,4 @@
+import { workspaceStorage, requireWorkspaceUserId } from "./auth/user-workspace.js";
 import { requireOnlyMe } from "./auth/only-me-guard.js";
 import {
   bestBoardAttempt,
@@ -69,21 +70,21 @@ const highlightLabels = {
 };
 
 function loadSelectedNodeId() {
-  return localStorage.getItem(SELECTED_NODE_STORAGE_KEY) || null;
+  return workspaceStorage.getItem(SELECTED_NODE_STORAGE_KEY) || null;
 }
 
 function saveSelectedNodeId(id) {
-  if (id) localStorage.setItem(SELECTED_NODE_STORAGE_KEY, id);
-  else localStorage.removeItem(SELECTED_NODE_STORAGE_KEY);
+  if (id) workspaceStorage.setItem(SELECTED_NODE_STORAGE_KEY, id);
+  else workspaceStorage.removeItem(SELECTED_NODE_STORAGE_KEY);
 }
 
 function loadSelectedRepairId() {
-  return localStorage.getItem(SELECTED_REPAIR_STORAGE_KEY) || null;
+  return workspaceStorage.getItem(SELECTED_REPAIR_STORAGE_KEY) || null;
 }
 
 function saveSelectedRepairId(id) {
-  if (id) localStorage.setItem(SELECTED_REPAIR_STORAGE_KEY, id);
-  else localStorage.removeItem(SELECTED_REPAIR_STORAGE_KEY);
+  if (id) workspaceStorage.setItem(SELECTED_REPAIR_STORAGE_KEY, id);
+  else workspaceStorage.removeItem(SELECTED_REPAIR_STORAGE_KEY);
 }
 
 function setSelectedNodeId(id) {
@@ -2362,8 +2363,8 @@ if (dashboardGameQueue) {
     const button = event.target.closest("[data-game-id]");
     if (!button) return;
 
-    localStorage.setItem("gm_brain_selected_game_v1", button.dataset.gameId);
-    localStorage.setItem("gm_brain_selected_game_ply_v1", "0");
+    workspaceStorage.setItem("gm_brain_selected_game_v1", button.dataset.gameId);
+    workspaceStorage.setItem("gm_brain_selected_game_ply_v1", "0");
     window.location.href = "./games.html";
   });
 }
