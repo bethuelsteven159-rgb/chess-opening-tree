@@ -280,7 +280,17 @@ The final shape is:
 - Repair = fix repeating leaks
 - Support = keep the bigger mission connected to the chess work
 
-## Multiple users
+## Notifications
+
+The Notifications button appears on every signed-in page. It shows due and overdue reminders (including reminder times and snoozes), goal deadlines within seven days, goals without an update for a week, scheduled opening/position/repair reviews, high-priority repairs, and tournaments in the next seven days. Completed, paused, disabled, and deleted sources are excluded where appropriate. Each alert opens its goal, reminder, review mode, repair, or event.
+
+Use Mark all read to clear the unread badge, Snooze 1 day to hide an alert for 24 hours, or Dismiss to hide the current occurrence. New occurrences of recurring reminders and newly scheduled review batches can notify again. Choose notifications lets each user mute individual categories. These preferences and alert states are account-scoped on the current device.
+
+Alerts update after local study changes, every minute while the app is visible, and when returning to the app. Refresh checks saved remote study data and retains the app's existing offline recovery behavior. This is an in-app notification center; it does not deliver operating-system notifications or alerts while the app is closed. No additional database migration is required.
+
+Validation: `node --experimental-vm-modules scripts/test-notifications.cjs` and `node --experimental-vm-modules scripts/test-multi-user.cjs`.
+
+## Multiple-user setup
 
 Any Google account can sign in. Each account has its own repertoire, games, notes, reviews, recovery snapshots, and pending offline saves. The account is shown beside Logout; to switch accounts, log out and sign in with another Google account.
 

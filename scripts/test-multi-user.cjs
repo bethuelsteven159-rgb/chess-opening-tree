@@ -14,8 +14,8 @@ Object.defineProperties(localStorage, {
 async function openAccount(id, email) {
   let authChange;
   const redirects = [];
-  const window = { location: { replace: url => redirects.push(url) } };
-  const context = vm.createContext({ window, localStorage, console, crypto: { randomUUID } });
+  const window = { location: { replace: url => redirects.push(url) }, dispatchEvent() {} };
+  const context = vm.createContext({ window, localStorage, console, crypto: { randomUUID }, CustomEvent: class {} });
   const client = { auth: {
     getSession: async () => ({ data: { session: { user: { id, email } } } }),
     onAuthStateChange: fn => { authChange = fn; }
@@ -43,6 +43,11 @@ async function openAccount(id, email) {
   assert.equal((await owner.db.loadGames()).length, 0);
   assert.ok(other.storage.getItem('gm_opening_tree_games_pending_sync_v1'));
   assert.equal(owner.storage.getItem('gm_opening_tree_games_pending_sync_v1'), null);
+  other.storage.setItem('gm_notifications_settings_v1', JSON.stringify({ goals: false }));
+  other.storage.setItem('gm_notifications_state_v1', JSON.stringify({ alert: { dismissed: true } }));
+  assert.equal(owner.storage.getItem('gm_notifications_settings_v1'), null);
+  assert.equal(owner.storage.getItem('gm_notifications_state_v1'), null);
+  assert.equal(other.db.notificationData().goals.length, 0);
   const reopened = await openAccount('other', 'other@example.com');
   assert.equal((await reopened.db.loadGames())[0].id, 'other-game');
   owner.authChange('SIGNED_OUT', null);

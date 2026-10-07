@@ -680,6 +680,7 @@ function readLocalJson(key) {
 
 function writeLocalJson(key, value) {
   workspaceStorage.setItem(key, JSON.stringify(value));
+  window.dispatchEvent(new CustomEvent("gm-study-data-change"));
 }
 
 function clearLocalJson(key) {
@@ -2727,6 +2728,18 @@ async function deleteRepairAttempt(id) {
 }
 
 window.OpeningDB = {
+  notificationData() {
+    const rows = key => {
+      const value = readLocalJson(key);
+      return Array.isArray(value) ? value : [];
+    };
+    return {
+      goals: rows(GOAL_STORAGE_KEY), reminders: rows(APP_REMINDER_STORAGE_KEY),
+      reviewItems: rows(REVIEW_ITEM_STORAGE_KEY), nodes: rows(NODE_STORAGE_KEY),
+      positions: rows(POSITION_STORAGE_KEY), repairs: rows(REPAIR_STORAGE_KEY),
+      events: rows(TOURNAMENT_NOTE_STORAGE_KEY)
+    };
+  },
   loadNodes,
   saveAllNodes,
   upsertNode,

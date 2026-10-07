@@ -1,4 +1,5 @@
 import "./db.js";
+import { initNotifications } from "./notifications.js";
 import { workspaceStorage, workspaceUser } from "./auth/user-workspace.js";
 import { supabase } from "./config/supabase.js";
 import {
@@ -678,6 +679,7 @@ export function bindImportButton(triggerButton, input) {
 }
 
 export function initPageChrome() {
+  initNotifications();
   applyTheme();
   applyBoardAppearance();
   const logoutButton = document.getElementById("logoutBtn");

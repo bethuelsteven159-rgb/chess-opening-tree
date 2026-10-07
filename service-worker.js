@@ -1,4 +1,4 @@
-const CACHE_NAME = "gm-opening-tree-v13";
+const CACHE_NAME = "gm-opening-tree-v14";
 const PIECE_ASSETS = [
   "assets/pieces/classic/wK.svg",
   "assets/pieces/classic/wQ.svg",
@@ -38,6 +38,8 @@ const SCRIPT_ASSETS = [
   "js/chess-brain-utils.js",
   "js/support-utils.js",
   "js/ui-shell.js",
+  "js/notifications.js",
+  "js/notification-utils.js",
   "js/app.js",
   "js/dashboard.js",
   "js/games.js",
